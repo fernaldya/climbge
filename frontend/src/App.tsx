@@ -77,12 +77,14 @@ function Dashboard({ profile, onLogout }: { profile: UserProfile; onLogout: () =
     <div className="min-h-screen p-6 flex flex-col gap-4">
       <div className="text-xl font-semibold">Welcome, {profile.username} 👋</div>
       <div className="text-sm text-muted-foreground">
-        Started climbing: {profile.startedClimbing} • Joined: {new Date(profile.joinDate).toLocaleString()}
+        You've been climbing for {profile.demography.months_climbing}
+      </div>
+      <div className="text-sm text-muted-foreground">
+        Happy to have you here! Start tracking your climbing progress now.
       </div>
       <div className="flex gap-3">
         <button className="px-3 py-2 rounded-md border" onClick={onLogout}>Log out</button>
       </div>
-      <div className="mt-6 text-muted-foreground">App shell goes here…</div>
     </div>
   );
 }

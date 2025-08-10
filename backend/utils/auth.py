@@ -1,5 +1,5 @@
 # backend/utils/auth.py
-from datetime import datetime
+from datetime import datetime, date
 from flask import Blueprint, request, jsonify
 from utils.connect_db import pool
 from utils.security import hash_password, login_user
@@ -93,16 +93,27 @@ def signup():
     login_user(str(user_id))
 
     # Build response
-    profile = {"user_id": str(user_id), "username": uname}
-    if any([name, email, started_date, age, home_city, home_gym, sex]):
-        profile["demography"] = {
-            "name": name,
-            "email": email,
-            "started_climbing": started_date.isoformat() if started_date else None,
-            "age": age,
-            "home_city": home_city,
-            "home_gym": home_gym,
-            "sex": sex,
-        }
+    months_climbing = None
+    if started_date:
+        # Normalize both to first of month
+        start_norm = date(started_date.year, started_date.month, 1)
+        today = date.today()
+        today_norm = date(today.year, today.month, 1)
+        months_climbing = (today_norm.year - start_norm.year) * 12 + (today_norm.month - start_norm.month)
+
+    profile = {
+            "user_id": str(user_id),
+            "username": uname
+            }
+    profile["demography"] = {
+        "name": name,
+        "email": email,
+        "started_climbing": started_date.isoformat() if started_date else None,
+        "months_climbing": f'{months_climbing} months' ,
+        "age": age,
+        "home_city": home_city,
+        "home_gym": home_gym,
+        "sex": sex,
+    }
 
     return ok({"authenticated": True, "profile": profile}, 201)
