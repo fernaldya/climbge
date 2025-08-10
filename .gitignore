@@ -145,7 +145,7 @@ env/
 venv/
 ENV/
 env.bak/
-backend/.env.bak
+backend/.env.backup
 frontend/.env.bak
 venv.bak/
 
