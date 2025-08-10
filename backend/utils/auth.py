@@ -95,7 +95,6 @@ def signup():
     # Build response
     months_climbing = None
     if started_date:
-        # Normalize both to first of month
         start_norm = date(started_date.year, started_date.month, 1)
         today = date.today()
         today_norm = date(today.year, today.month, 1)
@@ -109,7 +108,7 @@ def signup():
         "name": name,
         "email": email,
         "started_climbing": started_date.isoformat() if started_date else None,
-        "months_climbing": f'{months_climbing} months' ,
+        "months_climbing": f'{months_climbing} months' if months_climbing is not None else None,
         "age": age,
         "home_city": home_city,
         "home_gym": home_gym,

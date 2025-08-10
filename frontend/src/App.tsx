@@ -77,7 +77,7 @@ function Dashboard({ profile, onLogout }: { profile: UserProfile; onLogout: () =
     <div className="min-h-screen p-6 flex flex-col gap-4">
       <div className="text-xl font-semibold">Welcome, {profile.username} 👋</div>
       <div className="text-sm text-muted-foreground">
-        You've been climbing for {profile.demography.months_climbing}
+        You've been climbing for {profile.demography.months_climbing}.
       </div>
       <div className="text-sm text-muted-foreground">
         Happy to have you here! Start tracking your climbing progress now.
