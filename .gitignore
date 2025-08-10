@@ -145,6 +145,8 @@ env/
 venv/
 ENV/
 env.bak/
+backend/.env.bak
+frontend/.env.bak
 venv.bak/
 
 # Spyder project settings
