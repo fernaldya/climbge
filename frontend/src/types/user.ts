@@ -13,6 +13,19 @@ export type SignUpData = {
 
 export type UserProfile = {
   username: string;
-  startedClimbing: string; // ISO date
-  joinDate: string;        // ISO date
+  startedClimbing: string;
+  demography?: { 
+    name?: string
+    age?: string;
+    sex?: string;
+    homeCity?: string;
+    homeGym?: string;
+    email?: string;
+  };
+  measurements?: {
+    height?: string;
+    weight?: string;
+    gripStrength?: string;
+    apeIndex?: string;
+  };
 };

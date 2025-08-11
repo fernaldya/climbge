@@ -1,15 +1,31 @@
-# backend/utils/auth.py
-from datetime import datetime, date
-from flask import Blueprint, request, jsonify
+from __future__ import annotations
+from datetime import date, datetime
 from utils.connect_db import pool
-from utils.security import hash_password, login_user
-from psycopg.errors import UniqueViolation
+from utils.security import hash_password, login_user, verify_password
+from flask import Blueprint, request, jsonify, session
+from psycopg.rows import dict_row
 
 auth_bp = Blueprint("auth", __name__)
 
+
+# --- helpers ------------------------------------------------------------------
 def ok(payload=None, status=200): return jsonify(payload or {}), status
 def err(code: str, message: str, status=400): return jsonify(error={"code": code, "message": message}), status
 
+# --- serializer --------------------------------------------------------------
+def to_user_profile(row: dict) -> dict:
+    started = row.get("started_climbing")
+    return {
+        "userId": str(row["user_id"]),
+        "username": row["username"],
+        "startedClimbing": row.get("started_climbing").isoformat() if isinstance(started, date) else None,
+        "age": row.get("age"),
+        "homeCity": row.get("home_city"),
+        "homeGym": row.get("home_gym"),
+        "name": row.get("name")
+    }
+
+# --- routes ------------------------------------------------------------------
 @auth_bp.post("/signup")
 def signup():
     data = request.get_json(silent=True) or {}
@@ -82,7 +98,6 @@ def signup():
                             """,
                             (user_id, started_date, age, home_city, home_gym, sex, email, name),
                         )
-
     except UniqueViolation:
         return err("username_taken", "That username is already taken.", 409)
     except Exception as e:
@@ -101,9 +116,9 @@ def signup():
         months_climbing = (today_norm.year - start_norm.year) * 12 + (today_norm.month - start_norm.month)
 
     profile = {
-            "user_id": str(user_id),
-            "username": uname
-            }
+        "user_id": str(user_id),
+        "username": uname
+        }
     profile["demography"] = {
         "name": name,
         "email": email,
@@ -116,3 +131,89 @@ def signup():
     }
 
     return ok({"authenticated": True, "profile": profile}, 201)
+
+
+@auth_bp.post("/login")
+def login():
+    """
+    Body: { username, password }
+    On success: sets session and returns { ok: true, profile }
+    """
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+
+    if not username or not password:
+        return jsonify(error={"code": "invalid_request", "message": "Username and password are required."}), 400
+
+    try:
+        with pool.connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cur:
+                # Authenticate user
+                cur.execute(
+                    """
+                    SELECT user_id, password
+                    FROM public.users
+                    WHERE username = %s
+                    limit 1
+                    """,
+                    (username,),
+                )
+                user_verify = cur.fetchone()
+                if not user_verify or not verify_password(password, user_verify['password']):
+                    return jsonify(error={"code": "invalid_credentials", "message": "Invalid credentials."}), 401
+
+                # Get user profile
+                cur.execute(
+                    """
+                    SELECT user_id, username, started_climbing, age, home_city, home_gym, sex, name, email
+                    FROM public.user_profile
+                    WHERE user_id = %s
+                    limit 1
+                    """,
+                    (user_verify['user_id'],)
+                )
+                row = cur.fetchone()
+    except Exception as e:
+        print("LOGIN ERROR:", e)
+        return jsonify(error={"code": "db_error", "message": "Database error."}), 500
+
+    # OK → set server session
+    session.clear()
+    session["user_id"] = user_verify['user_id']
+    session.permanent = True  # lifetime set in app config
+
+    return jsonify(ok=True, profile=to_user_profile(row)), 200
+
+@auth_bp.post("/logout")
+def logout():
+    session.clear()
+    return jsonify(ok=True), 200
+
+
+@auth_bp.get("/me")
+def me():
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify(authenticated=False), 200
+
+    try:
+        with pool.connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT user_id, username, password
+                FROM users
+                WHERE user_id = %s
+                """,
+                (uid,),
+            )
+            row = cur.fetchone()
+    except Exception:
+        # degrade to logged-out if DB is down
+        return jsonify(authenticated=False), 200
+
+    if not row:
+        session.clear()
+        return jsonify(authenticated=False), 200
+
+    return jsonify(authenticated=True, profile=to_user_profile(row)), 200
