@@ -2,8 +2,10 @@ from __future__ import annotations
 from datetime import date, datetime
 from utils.connect_db import pool
 from utils.security import hash_password, login_user, verify_password
+from utils.user_profile import fetch_user_profile
 from flask import Blueprint, request, jsonify, session
 from psycopg.rows import dict_row
+from psycopg.errors import UniqueViolation
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -14,18 +16,26 @@ def err(code: str, message: str, status=400): return jsonify(error={"code": code
 
 # --- serializer --------------------------------------------------------------
 def to_user_profile(row: dict) -> dict:
-    started = row.get("started_climbing")
     return {
         "userId": str(row["user_id"]),
         "username": row["username"],
-        "startedClimbing": row.get("started_climbing").isoformat() if isinstance(started, date) else None,
-        "age": row.get("age"),
-        "homeCity": row.get("home_city"),
-        "homeGym": row.get("home_gym"),
-        "name": row.get("name")
+        "demography": {
+            "startedClimbing": row["started_climbing"].isoformat(),
+            "age": row["age"],
+            "homeCity": row["home_city"],
+            "homeGym": row["home_gym"],
+            "name": row["name"]
+        },
+        "measurements": {
+            "height": row["height"],
+            "weight": row["weight"],
+            "apeIndex": row["ape_index"],
+            "gripStrength": row["grip_strength"],
+        }
     }
 
-# --- routes ------------------------------------------------------------------
+# --- ENDPOINTS ---------------------------------------------------------------
+# SIGNUP
 @auth_bp.post("/signup")
 def signup():
     data = request.get_json(silent=True) or {}
@@ -37,15 +47,14 @@ def signup():
     if not username or not password:
         return err("invalid_input", "Username and password are required.", 422)
 
-    # optional fields
     started_date = (data.get("startedClimbing") or "").strip()
-    if started_date:
-        try:
-            # Expecting full date already, e.g. "2023-03-01"
-            started_date = datetime.strptime(started_date, "%Y-%m-%d").date()
-        except ValueError:
-            return err("invalid_started_climbing", "startedClimbing must be 'YYYY-MM-DD'.", 422)
+    try:
+        # Expecting full date already, e.g. "2023-03-01"
+        started_date = datetime.strptime(started_date, "%Y-%m-%d").date()
+    except ValueError:
+        return err("invalid_started_climbing", "startedClimbing must be 'YYYY-MM-DD'.", 422)
 
+    # optional fields
     email = (data.get("email") or "").strip() or None
     name = (data.get("name") or "").strip() or None
     age_val = data.get("age")
@@ -64,7 +73,6 @@ def signup():
 
     pwd_hash = hash_password(password)
 
-    # Insert users + optional demography in one transaction
     try:
         with pool.connection() as conn:
             with conn.transaction():
@@ -133,6 +141,7 @@ def signup():
     return ok({"authenticated": True, "profile": profile}, 201)
 
 
+# LOGIN
 @auth_bp.post("/login")
 def login():
     """
@@ -164,16 +173,7 @@ def login():
                     return jsonify(error={"code": "invalid_credentials", "message": "Invalid credentials."}), 401
 
                 # Get user profile
-                cur.execute(
-                    """
-                    SELECT user_id, username, started_climbing, age, home_city, home_gym, sex, name, email
-                    FROM public.user_profile
-                    WHERE user_id = %s
-                    limit 1
-                    """,
-                    (user_verify['user_id'],)
-                )
-                row = cur.fetchone()
+                row = fetch_user_profile(user_verify['user_id'])
     except Exception as e:
         print("LOGIN ERROR:", e)
         return jsonify(error={"code": "db_error", "message": "Database error."}), 500
@@ -183,31 +183,64 @@ def login():
     session["user_id"] = user_verify['user_id']
     session.permanent = True  # lifetime set in app config
 
-    return jsonify(ok=True, profile=to_user_profile(row)), 200
+    return jsonify(ok=True, profile=row), 200
 
 @auth_bp.post("/logout")
 def logout():
     session.clear()
     return jsonify(ok=True), 200
 
+@auth_bp.post("/feedback")
+def feedback():
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify(error={"code": "unauthorized", "message": "Not logged in."}), 401
+
+    data = request.get_json(silent=True) or {}
+    feedback = (data.get("feedback") or "").strip()
+    if not feedback:
+        return jsonify(error={"code": "invalid_request", "message": "Feedback is required."}), 400
+    if len(feedback) > 4000:
+        return jsonify(error={"code": "too_long", "message": "Max 4000 characters."}), 400
+
+    try:
+        with pool.connection() as conn:
+            with conn.transaction():
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(
+                        "SELECT username FROM public.users WHERE user_id = %s LIMIT 1",
+                        (uid,),
+                    )
+                    row = cur.fetchone()
+                    if not row:
+                        return jsonify(error={"code": "not_found", "message": "User not found."}), 404
+
+                    # Insert feedback
+                    cur.execute(
+                        """
+                        INSERT INTO public.user_feedback (user_id, username, feedback)
+                        VALUES (%s, %s, %s)
+                        """,
+                        (uid, row["username"], feedback),
+                    )
+        return jsonify(ok=True), 200
+
+    except Exception:
+        # Logging
+        return jsonify(error={"code": "db_error", "message": "Database error."}), 500
+
+    return jsonify(ok=True), 200
+
+
 
 @auth_bp.get("/me")
 def me():
-    uid = session.get("user_id")
-    if not uid:
-        return jsonify(authenticated=False), 200
-
     try:
-        with pool.connection() as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT user_id, username, password
-                FROM users
-                WHERE user_id = %s
-                """,
-                (uid,),
-            )
-            row = cur.fetchone()
+        uid = session.get("user_id")
+        if not uid:
+            return jsonify(authenticated=False), 200
+
+        row = fetch_user_profile(uid)
     except Exception:
         # degrade to logged-out if DB is down
         return jsonify(authenticated=False), 200
@@ -216,4 +249,4 @@ def me():
         session.clear()
         return jsonify(authenticated=False), 200
 
-    return jsonify(authenticated=True, profile=to_user_profile(row)), 200
+    return jsonify(authenticated=True, profile=row), 200

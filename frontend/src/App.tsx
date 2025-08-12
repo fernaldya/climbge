@@ -6,7 +6,7 @@ import { apiMe, apiLogout } from './lib/api';
 import { LoginPage } from './LoginPage';
 import { SignupPage } from './SignupPage';
 
-// Tab pages (stubs)
+// Tab pages
 // import { HomeTab } from './tabs/HomePage';
 // import { AnalysisTab } from './tabs/AnalysisPage';
 // import { ClimbTab } from './tabs/ClimbPage';
@@ -118,7 +118,7 @@ function AppShell({
       {/* Simple header; customize later */}
       <header className="p-4 border-b flex items-center justify-between">
         <div className="font-semibold">climbge</div>
-        <div className="text-sm text-muted-foreground">Hi, {profile.username}</div>
+        <div className="text-sm text-muted-foreground">Hi, {profile.demography?.name ?? profile.username}</div>
       </header>
 
       {/* Active tab content */}

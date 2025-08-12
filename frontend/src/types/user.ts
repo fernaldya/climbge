@@ -13,9 +13,9 @@ export type SignUpData = {
 
 export type UserProfile = {
   username: string;
-  startedClimbing: string;
-  demography?: { 
-    name?: string
+  demography?: {
+    startedClimbing: string;
+    name?: string;
     age?: string;
     sex?: string;
     homeCity?: string;
@@ -29,3 +29,14 @@ export type UserProfile = {
     apeIndex?: string;
   };
 };
+
+export type SentSummaryWeek = {
+    username: string;
+    totalRoutesSent?: number;
+}
+
+export type SentSummary = {
+    username: string;
+    totalRoutesSent?: number;
+    highestGrade?: string;
+}
