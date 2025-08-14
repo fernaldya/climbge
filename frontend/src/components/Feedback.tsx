@@ -27,6 +27,7 @@ export function FeedbackDialog({
       await onSubmit(text.trim());
       setText('');
       onOpenChange(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       setError(e?.message || 'Failed to submit feedback');
     } finally {

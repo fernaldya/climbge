@@ -50,7 +50,7 @@ def fetch_user_profile(user_id):
         'user_id': str(row['user_id']),
         'username': row['username'],
         'demography': {
-            'started_climbing': row['started_climbing'],
+            'startedClimbing': row['started_climbing'],
             'age': row.get('age') or '-',
             'homeCity': row.get('home_city') or '-',
             'homeGym': row.get('home_gym') or '-',

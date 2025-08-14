@@ -139,10 +139,10 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
       <div className="flex-1" />
         {/* Settings & Actions (sticky) */}
         <div className="px-2 space-y-3 sticky bottom-20 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <Button variant="outline" className="w-full justify-start gap-3 h-12">
+            {/* <Button variant="outline" className="w-full justify-start gap-3 h-12">
                 <Settings className="h-5 w-5" />
                 Settings & Preferences
-            </Button>
+            </Button> */}
             <Button variant="outline" className="w-full justify-start gap-3 h-12" onClick={() => setFeedbackDialogOpen(true)}>
                 <MessageSquareShare className="h-5 w-5" />
                 Let us know how you feel about Climbge
