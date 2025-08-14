@@ -128,7 +128,7 @@ ipython_config.py
 __pypackages__/
 
 *cookies.txt*
-
+project_notes.md
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid
