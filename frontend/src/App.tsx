@@ -7,7 +7,7 @@ import { LoginPage } from './LoginPage';
 import { SignupPage } from './SignupPage';
 
 // Tab pages
-// import { HomeTab } from './tabs/HomePage';
+import { HomeTab } from './tabs/HomePage';
 // import { AnalysisTab } from './tabs/AnalysisPage';
 // import { ClimbTab } from './tabs/ClimbPage';
 // import { HistoryTab } from './tabs/HistoryPage';
@@ -89,8 +89,8 @@ export default function App() {
         }
       >
         <Route index element={<Navigate to="profile" replace />} />
-        {/* <Route path="home" element={<HomeTab />} />
-        <Route path="analysis" element={<AnalysisTab />} />
+        <Route path="home" element={<HomeTab />} />
+        {/* <Route path="analysis" element={<AnalysisTab />} />
         <Route path="climb" element={<ClimbTab />} />
         <Route path="history" element={<HistoryTab />} /> */}
         <Route path="profile" element={<ProfileTab userProfile={profile} onLogout={handleLogout} />} />
@@ -115,12 +115,6 @@ function AppShell({
 }) {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Simple header; customize later */}
-      <header className="p-4 border-b flex items-center justify-between">
-        <div className="font-semibold">climbge</div>
-        <div className="text-sm text-muted-foreground">Hi, {profile.demography?.name ?? profile.username}</div>
-      </header>
-
       {/* Active tab content */}
       <main className="flex-1 p-4">
         <Outlet />
@@ -130,9 +124,9 @@ function AppShell({
       <nav className="sticky bottom-0 border-t bg-background">
         <ul className="grid grid-cols-5">
           <TabLink to="/app/home" label="Home" />
-          <TabLink to="/app/analysis" label="Analysis" />
+          {/* <TabLink to="/app/analysis" label="Analysis" />
           <TabLink to="/app/climb" label="Climb" />
-          <TabLink to="/app/history" label="History" />
+          <TabLink to="/app/history" label="History" /> */}
           <TabLink to="/app/profile" label="Profile" />
         </ul>
       </nav>
