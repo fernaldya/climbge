@@ -126,6 +126,8 @@ function AppShell({
         {/* Using 3 tabs: Home, History, Profile */}
         <ul className="grid grid-cols-3">
           <TabLink to="/app/home" label="Home" />
+          {/* <TabLink to="/app/analysis" label="Analysis" />
+          <TabLink to="/app/climb" label="Climb" /> */ }
           <TabLink to="/app/history" label="History" />
           <TabLink to="/app/profile" label="Profile" />
         </ul>
