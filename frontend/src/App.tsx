@@ -10,7 +10,7 @@ import { SignupPage } from './SignupPage';
 import { HomeTab } from './tabs/HomePage';
 // import { AnalysisTab } from './tabs/AnalysisPage';
 // import { ClimbTab } from './tabs/ClimbPage';
-// import { HistoryTab } from './tabs/HistoryPage';
+import { HistoryTab } from './tabs/HistoryPage';
 import { ProfileTab } from './tabs/ProfilePage';
 
 export default function App() {
@@ -32,6 +32,7 @@ export default function App() {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
@@ -58,7 +59,6 @@ export default function App() {
             <LoginPage
               onLogin={(p) => {
                 setProfile(p);
-                // land on home tab after login
                 navigate('/app/profile', { replace: true });
               }}
             />
@@ -88,16 +88,17 @@ export default function App() {
           </RequireAuth>
         }
       >
+        {/* Default to History */}
         <Route index element={<Navigate to="profile" replace />} />
         <Route path="home" element={<HomeTab />} />
         {/* <Route path="analysis" element={<AnalysisTab />} />
-        <Route path="climb" element={<ClimbTab />} />
-        <Route path="history" element={<HistoryTab />} /> */}
+        <Route path="climb" element={<ClimbTab />} /> */}
+        <Route path="history" element={<HistoryTab />} />
         <Route path="profile" element={<ProfileTab userProfile={profile} onLogout={handleLogout} />} />
       </Route>
 
       {/* Root redirect */}
-      <Route path="/" element={<Navigate to={profile ? '/app/profile' : '/login'} replace />} />
+      <Route path="/" element={<Navigate to={profile ? '/app/history' : '/login'} replace />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -122,11 +123,10 @@ function AppShell({
 
       {/* Bottom tab bar */}
       <nav className="sticky bottom-0 border-t bg-background">
-        <ul className="grid grid-cols-5">
+        {/* Using 3 tabs: Home, History, Profile */}
+        <ul className="grid grid-cols-3">
           <TabLink to="/app/home" label="Home" />
-          {/* <TabLink to="/app/analysis" label="Analysis" />
-          <TabLink to="/app/climb" label="Climb" />
-          <TabLink to="/app/history" label="History" /> */}
+          <TabLink to="/app/history" label="History" />
           <TabLink to="/app/profile" label="Profile" />
         </ul>
       </nav>

@@ -1,7 +1,7 @@
 import bcrypt
 from flask import session
 
-SESSION_KEY = "uid"
+SESSION_KEY = "user_id"
 
 def hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
