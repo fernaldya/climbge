@@ -12,4 +12,13 @@ export type LastClimb = {
   routesSent: number;
   attempts: number;
   highestGrade: string;
-}
+};
+
+export type HistoricalClimb = {
+    sent: number;
+    attempted: number;
+    flashes: number;
+    best: string;
+    sentPct: string;
+    climbDay: string;
+};
