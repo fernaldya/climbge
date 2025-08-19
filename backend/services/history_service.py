@@ -15,10 +15,10 @@ def fetch_climb_history(user_id: str):
                 SELECT sent, attempted, flashes, best,
                        TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM
                        TO_CHAR((sent / NULLIF(attempted, 0)::float) * 100, 'FM999D99'))) AS sent_pct,
-                       climb_date
+                       climb_date, location
                 FROM climber_session_history
                 WHERE user_id = %s
-                ORDER BY id
+                ORDER BY climb_date desc, session_seq desc
                 """,
                 (user_id,)
             )
@@ -31,7 +31,8 @@ def fetch_climb_history(user_id: str):
                 "flashes": r["flashes"] if r["flashes"] is not None else 0,
                 "best": r["best"] if r["best"] is not None else '-',
                 "sentPct": f'{r["sent_pct"]}%' if r["sent_pct"] else '0%',
-                "climbDay": get_relative_day(r["climb_date"], week_cap=3)
+                "climbDay": get_relative_day(r["climb_date"], week_cap=3),
+                "location": r["location"]
             } for r in row
         ]
         return {'history': history}, 200
