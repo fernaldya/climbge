@@ -8,17 +8,14 @@ export type WeeklyClimbSummary = {
 
 export type LastClimb = {
   location: string;
-  climbedOn: string;
-  routesSent: number;
-  attempts: number;
+  climbDate: string;
   highestGrade: string;
+  totalSent: number;
+  totalAttempted: number;
 };
 
 export type HistoricalClimb = {
-    sent: number;
-    attempted: number;
-    flashes: number;
-    best: string;
-    sentPct: string;
-    climbDay: string;
+  totalSession: number;
+  totalSent: number;
+  totalAttempted: number;
 };

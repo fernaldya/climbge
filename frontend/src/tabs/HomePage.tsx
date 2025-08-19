@@ -66,7 +66,7 @@ export function HomeTab() {
                   {loading ? (
                     <Skeleton className="h-2 w-16" />
                   ) : (
-                    lastClimb?.climbedOn ?? "-"
+                    lastClimb?.climbDate ?? "-"
                   )}
                 </div>
               </div>
@@ -79,7 +79,7 @@ export function HomeTab() {
             <div className="flex flex-col items-center px-2">
               <Trophy className="h-7 w-7 text-orange-500" />
               <div className="mt-2 text-2xl font-semibold text-[rgba(236,130,55,255)]">
-                {loading ? <Skeleton className="h-7 w-12" /> : (lastClimb?.highestGrade ?? 20)}
+                {loading ? <Skeleton className="h-7 w-12" /> : (lastClimb?.highestGrade ?? '-')}
               </div>
               <div className="mt-1 text-xs text-muted-foreground leading-tight text-[rgba(220,130,55,255)]">
                 Highest Grade
@@ -89,7 +89,7 @@ export function HomeTab() {
             <div className="flex flex-col items-center px-2">
               <TrendingUp className="h-7 w-7 text-orange-500" />
               <div className="mt-2 text-2xl font-semibold text-[rgba(236,130,55,255)]">
-                {loading ? <Skeleton className="h-7 w-10" /> : lastClimb?.routesSent ?? 10}
+                {loading ? <Skeleton className="h-7 w-10" /> : lastClimb?.totalSent ?? '-'}
               </div>
               <div className="mt-1 text-xs text-muted-foreground leading-tight text-[rgba(220,130,55,255)]">
                 Routes Sent
@@ -99,7 +99,7 @@ export function HomeTab() {
             <div className="flex flex-col items-center px-2">
               <RotateCcw className="h-7 w-7 text-orange-500" />
               <div className="mt-2 text-2xl font-semibold text-[rgba(236,130,55,255)]">
-                {loading ? <Skeleton className="h-7 w-12" /> : (lastClimb?.attempts ?? 20)}
+                {loading ? <Skeleton className="h-7 w-12" /> : (lastClimb?.totalAttempted ?? '-')}
               </div>
               <div className="mt-1 text-xs text-muted-foreground leading-tight text-[rgba(220,130,55,255)]">
                 Routes Attempted
@@ -126,7 +126,7 @@ export function HomeTab() {
             <div className="flex flex-col items-center px-2">
               <Calendar className="h-7 w-7 text-orange-500" />
               <div className="mt-2 text-2xl font-semibold text-[rgba(236,130,55,255)]">
-                {loading ? <Skeleton className="h-7 w-12" /> : (summary?.sessions ?? 20)}
+                {loading ? <Skeleton className="h-7 w-12" /> : (summary?.totalSession ?? '-')}
               </div>
               <div className="mt-1 text-xs text-muted-foreground leading-tight text-[rgba(220,130,55,255)]">
                 Climbing Sessions
@@ -136,7 +136,7 @@ export function HomeTab() {
             <div className="flex flex-col items-center px-2">
               <TrendingUp className="h-7 w-7 text-orange-500" />
               <div className="mt-2 text-2xl font-semibold text-[rgba(236,130,55,255)]">
-                {loading ? <Skeleton className="h-7 w-10" /> : summary?.routesSent ?? 10}
+                {loading ? <Skeleton className="h-7 w-10" /> : summary?.totalSent ?? '-'}
               </div>
               <div className="mt-1 text-xs text-muted-foreground leading-tight text-[rgba(220,130,55,255)]">
                 Routes Sent
@@ -146,7 +146,7 @@ export function HomeTab() {
             <div className="flex flex-col items-center px-2">
               <RotateCcw className="h-7 w-7 text-orange-500" />
               <div className="mt-2 text-2xl font-semibold text-[rgba(236,130,55,255)]">
-                {loading ? <Skeleton className="h-7 w-12" /> : (summary?.attempts ?? 20)}
+                {loading ? <Skeleton className="h-7 w-12" /> : (summary?.totalAttempted ?? '-')}
               </div>
               <div className="mt-1 text-xs text-muted-foreground leading-tight text-[rgba(220,130,55,255)]">
                 Routes Attempted
