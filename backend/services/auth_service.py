@@ -4,7 +4,7 @@ from psycopg.errors import UniqueViolation
 from flask import session
 from utils.http import err
 from utils.security import hash_password, verify_password, login_user
-from utils.user_profile import fetch_user_profile
+from services.user_profile_service import fetch_user_profile
 from utils.connect_db import pool
 
 def signup_user(data: dict):
@@ -13,7 +13,6 @@ def signup_user(data: dict):
     if not username or not password:
         return err("invalid_input", "Username and password are required.", 422)
 
-    # parse startedClimbing (YYYY-MM-DD) if provided
     from datetime import datetime
     started_str = (data.get("startedClimbing") or "").strip()
     try:
