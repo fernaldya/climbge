@@ -75,7 +75,7 @@ function SessionCard({ s }: { s: HistoricalClimb }) {
   const row = s as unknown as {
     id?: string;
     climbDay: string;
-    gym?: string;
+    location?: string;
     sent: number ;
     attempted: number;
     best?: string | null;
@@ -87,14 +87,18 @@ function SessionCard({ s }: { s: HistoricalClimb }) {
 
   return (
     <div className="rounded-xl bg-[#FFF6ED] p-4 ring-1 ring-[#F5D7B3]">
-      {/* Header */}
-      <div className="mb-2 font-semibold text-base">{row.climbDay}</div>
-      {row.gym && (
-        <div className="mb-3 flex items-center gap-2 text-sm text-[#8A5A00]">
-          <MapPin className="h-3 w-3" />
-          <span className="truncate">{row.gym}</span>
+      {/* Header: left = date, right = location */}
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="font-semibold text-base">{row.climbDay}</div>
+
+        <div className="flex flex-col items-end">
+          {/* Location row (top-right) */}
+          <div className="flex items-center gap-1 text-[11px] text-[#8A5A00]">
+            <MapPin className="h-3 w-3" />
+            <span className="truncate max-w-[140px]">{row.location ?? "—"}</span>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Metrics (one box) */}
       <div className="grid grid-cols-3 gap-4 text-center">
