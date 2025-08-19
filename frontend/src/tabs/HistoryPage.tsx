@@ -72,7 +72,6 @@ export function HistoryTab() {
 }
 
 function SessionCard({ s }: { s: HistoricalClimb }) {
-  // Read exactly what BE gives you (no transforms)
   const row = s as unknown as {
     id?: string;
     climbDay: string;
@@ -103,11 +102,11 @@ function SessionCard({ s }: { s: HistoricalClimb }) {
         <div className="flex flex-col items-center">
           <div className="relative mb-1 flex items-center">
             <span className="text-xl font-bold text-[#E26E00]">{row.sent}</span>
-            <span className="mx-1 text-lg font-semibold text-[#E26E00]">/</span>
-            <span className="relative text-lg font-semibold text-[#E26E00] whitespace-nowrap">
+            <span className="mx-1 text-l text-[#E26E00]">/</span>
+            <span className="relative text-l text-[#E26E00] whitespace-nowrap">
               {row.attempted}
               {showFlashes && (
-                <span className="absolute -top-3 -right-3 flex items-center gap-0.5 rounded-full bg-[#FCE8D6] px-1.5 py-0.5 text-[10px] font-semibold text-[#E26E00]">
+                <span className="absolute -top-3 -right-3 flex items-center gap-0.5 rounded-full bg-[#FCE8D6] px-1.5 py-0.5 text-[9px] font-semibold text-[#E26E00]">
                   {row.flashes}
                   <Zap className="h-3 w-3" />
                 </span>
@@ -120,7 +119,7 @@ function SessionCard({ s }: { s: HistoricalClimb }) {
         {/* Best */}
         <div className="flex flex-col items-center">
           <div className="mb-1 text-xl font-bold text-[#E26E00]">{row.best ?? "—"}</div>
-          <div className="text-xs text-[#8A5A00]">Best</div>
+          <div className="text-xs text-[#8A5A00]">Best Grade</div>
         </div>
 
         {/* Send */}
@@ -128,7 +127,7 @@ function SessionCard({ s }: { s: HistoricalClimb }) {
           <div className="mb-1 text-xl font-bold text-[#E26E00] whitespace-nowrap">
             {row.sentPct}
           </div>
-          <div className="text-xs text-[#8A5A00]">Send</div>
+          <div className="text-xs text-[#8A5A00]">Send %</div>
         </div>
       </div>
     </div>
