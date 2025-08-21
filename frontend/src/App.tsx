@@ -8,8 +8,7 @@ import { SignupPage } from './SignupPage';
 
 // Tab pages
 import { HomeTab } from './tabs/HomePage';
-// import { AnalysisTab } from './tabs/AnalysisPage';
-// import { ClimbTab } from './tabs/ClimbPage';
+import { ClimbTab } from './tabs/ClimbPage';
 import { HistoryTab } from './tabs/HistoryPage';
 import { ProfileTab } from './tabs/ProfilePage';
 
@@ -91,8 +90,7 @@ export default function App() {
         {/* Default to History */}
         <Route index element={<Navigate to="profile" replace />} />
         <Route path="home" element={<HomeTab />} />
-        {/* <Route path="analysis" element={<AnalysisTab />} />
-        <Route path="climb" element={<ClimbTab />} /> */}
+        <Route path="climb" element={<ClimbTab />} />
         <Route path="history" element={<HistoryTab />} />
         <Route path="profile" element={<ProfileTab userProfile={profile} onLogout={handleLogout} />} />
       </Route>
@@ -124,10 +122,9 @@ function AppShell({
       {/* Bottom tab bar */}
       <nav className="sticky bottom-0 border-t bg-background">
         {/* Using 3 tabs: Home, History, Profile */}
-        <ul className="grid grid-cols-3">
+        <ul className="grid grid-cols-4">
           <TabLink to="/app/home" label="Home" />
-          {/* <TabLink to="/app/analysis" label="Analysis" />
-          <TabLink to="/app/climb" label="Climb" /> */ }
+          <TabLink to="/app/climb" label="Climb" />
           <TabLink to="/app/history" label="History" />
           <TabLink to="/app/profile" label="Profile" />
         </ul>
