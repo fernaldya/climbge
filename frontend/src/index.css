@@ -1,10 +1,21 @@
 @import "tailwindcss";
 
+
 /* Define theme tokens (Tailwind v4) */
 @theme {
   --color-brand: #F7A62D;      /* used as bg-brand, text-brand, border-brand */
   --color-brand-dark: #D88F23; /* used as bg-brand-dark, etc. */
   --color-brand-light: #F9B94F;
+}
+
+.text-muted-foreground {
+  color: #a16207;
+}
+.text-primary {
+  color: #e97316;
+}
+.bg-muted {
+  background-color: #fef2e8;
 }
 
 html, body, #root { height: 100%; } 
