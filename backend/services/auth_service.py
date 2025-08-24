@@ -7,6 +7,7 @@ from utils.security import hash_password, verify_password, login_user
 from services.user_profile_service import fetch_user_profile
 from utils.connect_db import pool
 
+
 def signup_user(data: dict):
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""

@@ -9,8 +9,8 @@ auth_bp = Blueprint("auth", __name__)
 @auth_bp.post("/signup")
 def signup():
     body = request.get_json(silent=True) or {}
-    payload, status = signup_user(body)
-    return jsonify(payload), status
+    # payload, status = signup_user(body)
+    return signup_user(body)
 
 
 @auth_bp.post("/login")
@@ -18,17 +18,14 @@ def login():
     body = request.get_json(silent=True) or {}
     username = body.get("username", "").strip()
     password = body.get("password", "")
-    payload, status = login_with_password(username, password)
-    return jsonify(payload), status
+    return login_with_password(username, password)
 
 
 @auth_bp.post("/logout")
 def logout():
-    payload, status = logout_user()
-    return jsonify(payload), status
+    return logout_user()
 
 
 @auth_bp.get("/me")
 def me():
-    payload, status = me_profile()
-    return jsonify(payload), status
+    return me_profile()

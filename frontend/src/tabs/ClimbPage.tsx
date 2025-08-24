@@ -5,9 +5,8 @@ import { Textarea } from "../components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { Separator } from "../components/ui/separator";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Trash2 } from "lucide-react";
 import { apiFetchGradeSystems, apiCommitClimbSession } from "../lib/api";
@@ -71,8 +70,6 @@ export function ClimbTab() {
   const [customGs, setCustomGs] = useState("");
   const [grade, setGrade] = useState("");
   const [desc, setDesc] = useState("");
-
-  const routeSeq = useRef(0);
 
   // helper to render system name from id
   const renderSystemName = (r: LocalRoute) =>
@@ -172,10 +169,10 @@ export function ClimbTab() {
     if (!gsId) return;
     if (isOther && !customGs.trim()) return;
 
-    routeSeq.current += 1;
+
 
     const route: LocalRoute = {
-      id: routeSeq.current,                 // local-only
+      id: uuid(),                 // local-only
       gradeSystem: gsId,
       gradeSystemLabel: isOther ? customGs.trim() : undefined,
       gradeLabel: grade.trim(),
@@ -365,7 +362,7 @@ export function ClimbTab() {
                   <div key={r.id} className="p-3 rounded-xl bg-muted/50">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-medium">
+                        <div className="text-sm">
                           {renderSystemName(r)} {r.gradeLabel}
                         </div>
                         {r.description && (
@@ -419,11 +416,11 @@ export function ClimbTab() {
       <Dialog open={openAdd} onOpenChange={setOpenAdd}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add route</DialogTitle>
+            <DialogTitle>Add Route</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-2">
-              <Label className="text-xs">Grade system</Label>
+              <Label className="text-xs">Grade System</Label>
                 <Select
                   value={gsId != null ? String(gsId) : undefined}
                   onValueChange={(v) => {
@@ -443,7 +440,7 @@ export function ClimbTab() {
                         {s.gradeSystem}
                       </SelectItem>
                     ))}
-                    <Separator className="my-1" />
+                    <SelectSeparator />
                     <SelectItem value="999">Other</SelectItem>
                   </SelectContent>
                 </Select>
@@ -483,7 +480,7 @@ export function ClimbTab() {
               <Label className="text-xs">Description (optional)</Label>
               <Textarea
                 rows={3}
-                placeholder="Beta notes, color, wall, etc."
+                placeholder="Route color, wall, etc."
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
               />

@@ -25,6 +25,7 @@ def fetch_grades() -> List[Dict[str, Any]]:
             """
             SELECT grade_id, grade_system, grades
             FROM grade_systems
+            WHERE grade_id != 999
             ORDER BY grade_id
             """
         )
@@ -89,9 +90,9 @@ def insert_session_routes(cur, *, session_id: str, routes: List[Dict[str, Any]])
 
     sql_session_routes = """
         INSERT INTO session_routes (
-            session_id, grade_system, grade_label, attempts, sent, sent_at
+            session_id, grade_system, grade_label, attempts, sent, sent_at, description
         )
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
 
     sql_unknown = """
@@ -111,11 +112,12 @@ def insert_session_routes(cur, *, session_id: str, routes: List[Dict[str, Any]])
         sent = bool(r.get("sent"))
         sent_raw = r.get('sent_at')
         sent_dt = parse_ts(sent_raw) if sent_raw else None
+        description = r.get('description')
 
         # (1) Always insert into session_routes
         cur.execute(
             sql_session_routes,
-            (session_id, gs_id, grade_label, attempts, sent, sent_dt),
+            (session_id, gs_id, grade_label, attempts, sent, sent_dt, description),
         )
 
         # (2) If “Other”, also log to unknown_grade_systems
