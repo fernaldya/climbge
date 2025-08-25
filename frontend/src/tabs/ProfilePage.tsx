@@ -102,21 +102,6 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
     }
   }
 
-  // ---------- Render ----------
-  const totalRoutes = 100; // placeholder
-
-  // Display strings for current (metric only UI)
-  const fmtNum = (v?: number | null, unit?: string) => {
-    if (v == null || !Number.isFinite(Number(v))) return '—';
-    const s = Math.round(Number(v) * 100) / 100;
-    return unit ? `${s} ${unit}` : `${s}`;
-  };
-
-  const heightDisplay = fmtNum((userProfile as any).measurements?.height, 'cm');
-  const weightDisplay = fmtNum((userProfile as any).measurements?.weight, 'kg');
-  const apeDisplay = fmtNum((userProfile as any).measurements?.apeIndex, 'cm');
-  const gripDisplay = fmtNum((userProfile as any).measurements?.gripStrength, 'kgf');
-
   return (
     <div className="flex flex-col min-h-screen pb-24">
       {/* Profile Header */}
@@ -147,11 +132,11 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
             </div>
 
             {/* Quick stats */}
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div>
-                <div className="text-xl font-bold text-primary">{totalRoutes}</div>
-                <div className="text-xs text-muted-foreground">Total Routes</div>
-              </div>
+            <div className="grid gap-4 text-center">
+              {/*<div>*/}
+              {/*  <div className="text-xl font-bold text-primary">{'-'}</div>*/}
+              {/*  <div className="text-xs text-muted-foreground">Total Routes</div>*/}
+              {/*</div>*/}
               <div>
                 <div className="text-xl font-bold text-primary">{yearsActive(userProfile.demography?.startedClimbing)}</div>
                 <div className="text-xs text-muted-foreground">Years Active</div>
@@ -174,20 +159,20 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
           <CardContent className="pt-0">
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <div className="text-sm text-muted-foreground mb-1">Height</div>
-                <div className="font-semibold">{heightDisplay}</div>
+                <div className="text-xs text-muted-foreground mb-1">Height</div>
+                <div className="font-semibold">{userProfile?.measurements?.height}</div>
               </div>
               <div>
-                <div className="text-sm text-muted-foreground mb-1">Weight</div>
-                <div className="font-semibold">{weightDisplay}</div>
+                <div className="text-xs text-muted-foreground mb-1">Weight</div>
+                <div className="font-semibold">{userProfile?.measurements?.weight}</div>
               </div>
               <div>
-                <div className="text-sm text-muted-foreground mb-1">Ape Index</div>
-                <div className="font-semibold">{apeDisplay}</div>
+                <div className="text-xs text-muted-foreground mb-1">Ape Index</div>
+                <div className="font-semibold">{userProfile?.measurements?.apeIndex}</div>
               </div>
               <div>
-                <div className="text-sm text-muted-foreground mb-1">Grip Strength</div>
-                <div className="font-semibold">{gripDisplay}</div>
+                <div className="text-xs text-muted-foreground mb-1">Grip Strength</div>
+                <div className="font-semibold">{userProfile?.measurements?.gripStrength}</div>
               </div>
             </div>
           </CardContent>

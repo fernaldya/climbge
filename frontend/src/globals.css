@@ -1,0 +1,10 @@
+/* src/globals.css */
+@import "tailwindcss/preflight";
+@import "tailwindcss/utilities";
+
+/* your overrides */
+@layer base {
+  :root {
+    --muted-foreground: oklch(0.708 0 0);
+  }
+}
