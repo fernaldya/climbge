@@ -8,7 +8,7 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Trash2 } from "lucide-react";
+import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Trash2, Check, Zap } from "lucide-react";
 import { apiFetchGradeSystems, apiCommitClimbSession } from "../lib/api";
 import type { LocalSession, LocalRoute, GradeSystem } from "../types/climb";
 
@@ -259,41 +259,69 @@ export function ClimbTab() {
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <Clock className="h-5 w-5" /> Session
+              <Clock className="h-5 w-5 text-orange-500" /> Session
             </span>
             <span className="font-mono text-lg tabular-nums">{hhmmss}</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <div className="flex items-center gap-2">
-            {!session ? (
-              <Button onClick={startSession} className="gap-2">
-                <Play className="h-4 w-4" /> Start
+          {!session ? (
+            // Idle → Big full-width Start button
+            <div className="mt-2">
+              <Button
+                onClick={startSession}
+                className="w-full select-none rounded-2xl p-6 gap-4 ring-1 ring-orange-200/60 bg-gradient-to-b from-orange-50 to-white hover:from-orange-100 active:scale-[0.99] transition-all"
+                aria-label="Start session"
+              >
+                <div className="h-14 w-14 rounded-full grid place-items-center ring-2 ring-orange-300/60 bg-orange-500/10">
+                  <Play className="h-7 w-7 text-orange-600" />
+                </div>
+                <div className="text-left">
+                  <div className="text-lg font-semibold">Tap to start your session</div>
+                </div>
               </Button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" onClick={pauseResume} className="gap-2">
-                  {running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                  {running ? "Pause" : "Resume"}
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={endSessionPrompt}
-                  className="gap-2"
-                >
-                  <Square className="h-4 w-4" /> End
-                </Button>
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            // Running → Two big buttons side-by-side
+            <div className="mt-2 grid grid-cols-2 gap-4">
+              <Button
+                variant="secondary"
+                onClick={pauseResume}
+                className="h-28 flex flex-col items-center justify-center rounded-2xl gap-3 ring-1 ring-orange-200/70 bg-yellow-50 hover:bg-yellow-100 active:scale-[0.99] transition-all"
+                aria-label={running ? "Pause session" : "Resume session"}
+              >
+                <div className="h-12 w-12 rounded-full grid place-items-center ring-2 ring-yellow-200/60 bg-white">
+                  {running ? (
+                    <Pause className="h-6 w-6 text-yellow-500" />
+                  ) : (
+                    <Play className="h-6 w-6 text-yellow-500" />
+                  )}
+                </div>
+                <div className="font-semibold">{running ? "Pause" : "Resume"}</div>
+              </Button>
+
+              <Button
+                variant="destructive"
+                onClick={endSessionPrompt}
+                className="h-28 flex flex-col items-center justify-center rounded-2xl gap-3 ring-1 ring-rose-200/70 bg-rose-50 hover:bg-rose-100 active:scale-[0.99] transition-all"
+                aria-label="End"
+              >
+                <div className="h-12 w-12 rounded-full grid place-items-center ring-2 ring-rose-300/60 bg-white">
+                  <Square className="h-6 w-6 text-rose-600" />
+                </div>
+                <div className="font-semibold">End</div>
+              </Button>
+            </div>
+          )}
         </CardContent>
+
       </Card>
 
       {/* Today’s Goals */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" /> Today’s goals
+            <Target className="h-5 w-5 text-orange-500" /> Today's goals
           </CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3">
@@ -317,7 +345,7 @@ export function ClimbTab() {
           </div>
           <div className="col-span-2">
             <Label className="text-xs flex items-center gap-2">
-              <FileText className="h-4 w-4" /> Notes
+              <FileText className="h-8 w-4 text-orange-500" /> Notes
             </Label>
             <Textarea
               rows={3}
@@ -335,7 +363,7 @@ export function ClimbTab() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5" /> Routes
+                <CheckCircle className="h-5 w-5 text-orange-500" /> Routes
               </span>
               <div className="flex items-center gap-2 text-sm">
                 <Badge variant="secondary">
@@ -349,56 +377,67 @@ export function ClimbTab() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Button onClick={addRouteClick} className="gap-2 w-full">
-              <Plus className="h-4 w-4" /> Add route
+              <Plus className="h-4 w-4 text-orange-500" /> Add route
             </Button>
 
             {session.routes.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No routes yet. Add your first one.
+                Climb your first route!
               </p>
             ) : (
               <div className="space-y-2">
                 {session.routes.map((r) => (
                   <div key={r.id} className="p-3 rounded-xl bg-muted/50">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm">
+                    <div className="grid grid-cols-5 gap-3 items-center">
+                      <div className="min-w-0">
+                        <div className="text-sm text-wrap">
                           {renderSystemName(r)} {r.gradeLabel}
                         </div>
                         {r.description && (
-                          <div className="text-sm text-muted-foreground mt-0.5">
+                          <div className="text-sm text-muted-foreground mt-0.5 text-wrap">
                             {r.description}
                           </div>
                         )}
                       </div>
+
+                      {/* Right: actions */}
                       <div className="flex items-center gap-2">
                         <Button
                           size="icon"
                           variant="secondary"
                           onClick={() => incAttempt(r.id, -1)}
                         >
-                          <Minus className="h-4 w-4" />
+                          <Minus className="h-4 w-4 ml-3" />
                         </Button>
-                        <Badge className="min-w-10 justify-center">
-                          {r.attempts}
-                        </Badge>
+                        <Badge className="min-w-10 justify-center -ml-3">{r.attempts}</Badge>
                         <Button
                           size="icon"
                           variant="secondary"
                           onClick={() => incAttempt(r.id, +1)}
                         >
-                          <Plus className="h-4 w-4" />
+                          <Plus className="h-4 w-4 -ml-3" />
                         </Button>
                         <Button
-                          variant={r.sent ? "default" : "secondary"}
                           onClick={() => toggleSent(r.id)}
+                          className={`gap-2 transition-opacity -ml-3 ${
+                            r.sent
+                              ? "opacity-100 bg-green-500 text-white hover:bg-green-600"
+                              : "opacity-40 hover:opacity-60"
+                          }`}
+                          variant="default"
                         >
-                          {r.sent ? "Sent" : "Mark sent"}
+                          {/* Fixed space for icon */}
+                          <span className="inline-block w-4">
+                            {r.sent && r.attempts === 1 && <Zap className="h-4 w-4 fill-yellow-500 text-yellow-500" />}
+                            {r.sent && r.attempts > 1 && <Check className="h-4 w-4" />}
+                          </span>
+                          Sent
                         </Button>
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => removeRoute(r.id)}
+                          className="-ml-2"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -450,6 +489,7 @@ export function ClimbTab() {
                     placeholder="Enter custom system name (e.g. Local Gym)"
                     value={customGs}
                     onChange={(e) => setCustomGs(e.target.value)}
+                    maxLength={12}
                   />
                 )}
             </div>
@@ -472,6 +512,7 @@ export function ClimbTab() {
                     placeholder="Type grade label (e.g. L10)"
                     value={grade}
                     onChange={(e) => setGrade(e.target.value)}
+                    maxLength={8}
                   />
                 )}
             </div>
@@ -483,6 +524,7 @@ export function ClimbTab() {
                 placeholder="Route color, wall, etc."
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
+                maxLength={15}
               />
             </div>
           </div>
@@ -507,7 +549,6 @@ export function ClimbTab() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="text-sm text-muted-foreground">Summary</div>
             <div className="rounded-xl border">
               <ScrollArea className="max-h-64">
                 <div className="divide-y">

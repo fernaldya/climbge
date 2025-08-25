@@ -5,6 +5,8 @@ import type { UserProfile } from './types/user';
 import { apiMe, apiLogout } from './lib/api';
 import { LoginPage } from './LoginPage';
 import { SignupPage } from './SignupPage';
+import { cn } from './components/ui/utils';
+import { Home, Mountain, History, User } from "lucide-react";
 
 // Tab pages
 import { HomeTab } from './tabs/HomePage';
@@ -104,6 +106,7 @@ export default function App() {
   );
 }
 
+
 /** Shell layout that draws the tabs and renders active tab via <Outlet/> */
 function AppShell({
   profile,
@@ -115,37 +118,45 @@ function AppShell({
   return (
     <div className="min-h-screen flex flex-col">
       {/* Active tab content */}
-      <main className="flex-1 p-4">
+      <main className="flex-1 p-4 pb-[4.5rem] sm:pb-20">
         <Outlet />
       </main>
 
       {/* Bottom tab bar */}
-      <nav className="sticky bottom-0 border-t bg-background">
-        {/* Using 3 tabs: Home, History, Profile */}
-        <ul className="grid grid-cols-4">
-          <TabLink to="/app/home" label="Home" />
-          <TabLink to="/app/climb" label="Climb" />
-          <TabLink to="/app/history" label="History" />
-          <TabLink to="/app/profile" label="Profile" />
+      <nav className="fixed inset-x-0 bottom-0 z-50 bg-white shadow-[0_-1px_4px_rgba(0,0,0,0.1)] h-16 pb-[env(safe-area-inset-bottom)]">
+        <ul className="grid grid-cols-4 h-full">
+          <TabLink to="/app/home" label="Home" icon={Home} />
+          <TabLink to="/app/climb" label="Climb" icon={Mountain} />
+          <TabLink to="/app/history" label="History" icon={History} />
+          <TabLink to="/app/profile" label="Profile" icon={User} />
         </ul>
       </nav>
     </div>
   );
 }
 
-function TabLink({ to, label }: { to: string; label: string }) {
+function TabLink({
+  to,
+  label,
+  icon: Icon,
+}: {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
   return (
     <li>
       <NavLink
         to={to}
         className={({ isActive }) =>
-          [
-            'block text-center py-3 text-sm',
-            isActive ? 'font-semibold' : 'text-muted-foreground hover:text-foreground',
-          ].join(' ')
+          cn(
+            "flex flex-col items-center justify-center py-2 text-xs font-medium transition-colors",
+            isActive ? "text-orange-500" : "text-muted-foreground"
+          )
         }
       >
-        {label}
+        <Icon className="h-5 w-5 mb-1" />
+        <span>{label}</span>
       </NavLink>
     </li>
   );

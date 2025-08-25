@@ -7,7 +7,6 @@
   --color-brand-dark: #D88F23; /* used as bg-brand-dark, etc. */
   --color-brand-light: #F9B94F;
 }
-
 .text-muted-foreground {
   color: #a16207;
 }
@@ -17,5 +16,11 @@
 .bg-muted {
   background-color: #fef2e8;
 }
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 
 html, body, #root { height: 100%; } 
