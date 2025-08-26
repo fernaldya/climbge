@@ -2,11 +2,11 @@ import os
 from psycopg_pool import ConnectionPool
 import logging
 
-DB_USER = os.getenv("db_user")
-DB_PASS = os.getenv("db_pass")
-DB_HOST = os.getenv("db_host")
-DB_PORT = os.getenv("db_port", "5432")
-DB_NAME = os.getenv("db_name", "postgres")
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "postgres")
 
 dsn = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 

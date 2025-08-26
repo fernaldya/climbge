@@ -20,7 +20,7 @@ const LS_KEYS = {
 
 
 // --- Helpers ---------------------------------------------------------------
-function uuid() {
+function uuid(): string {
   return crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -170,7 +170,6 @@ export function ClimbTab() {
     if (isOther && !customGs.trim()) return;
 
 
-
     const route: LocalRoute = {
       id: uuid(),                 // local-only
       gradeSystem: gsId,
@@ -186,7 +185,7 @@ export function ClimbTab() {
   }
 
 
-  function incAttempt(id: number, delta = 1) {
+  function incAttempt(id: string, delta = 1) {
     if (!session) return;
     setSession({
       ...session,
@@ -195,7 +194,7 @@ export function ClimbTab() {
       ),
     });
   }
-  function toggleSent(id: number) {
+  function toggleSent(id: string) {
     if (!session) return;
     const now = new Date().toISOString();
     setSession({
@@ -212,7 +211,7 @@ export function ClimbTab() {
       ),
     });
   }
-  function removeRoute(id: number) {
+  function removeRoute(id: string) {
     if (!session) return;
     setSession({ ...session, routes: session.routes.filter((r) => r.id !== id) });
   }
@@ -502,7 +501,7 @@ export function ClimbTab() {
                       <SelectValue placeholder="Select grade" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(byId.get(gsId!)?.grades ?? []).map((g) => (
+                      {((byId.get(gsId!)?.grades ?? []) as string[]).map((g) => (
                         <SelectItem key={g} value={g}>{g}</SelectItem>
                       ))}
                     </SelectContent>
@@ -590,46 +589,6 @@ export function ClimbTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-// --- GradeScroller ---------------------------------------------------------
-function GradeScroller({
-  list,
-  value,
-  onChange,
-}: {
-  list: string[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const idx = Math.max(0, value ? list.indexOf(value) : -1);
-  useEffect(() => {
-    if (!value) onChange(list[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list]);
-  return (
-    <div className="flex items-center gap-2">
-      <Button
-        type="button"
-        variant="secondary"
-        size="icon"
-        onClick={() => onChange(list[Math.max(0, idx > 0 ? idx - 1 : 0)])}
-      >
-        <Minus className="h-4 w-4" />
-      </Button>
-      <div className="flex-1 text-center font-medium">{value || list[0]}</div>
-      <Button
-        type="button"
-        variant="secondary"
-        size="icon"
-        onClick={() =>
-          onChange(list[Math.min(list.length - 1, idx >= 0 ? idx + 1 : 1)])
-        }
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
     </div>
   );
 }

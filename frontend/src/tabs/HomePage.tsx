@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "../components/ui/card";
 import { Skeleton } from "../components/ui/skeleton";
-import { TrendingUp, Trophy, RotateCcw, BicepsFlexed, Calendar, Mountain, Dumbbell, BookOpen, Users, MapPin, Timer } from "lucide-react";
+import { TrendingUp, Trophy, RotateCcw, BicepsFlexed, Calendar, MapPin, Timer } from "lucide-react";
 import { apiLastClimb, apiWeeklySummary } from "../lib/api";
 import type { WeeklyClimbSummary, LastClimb } from "../types/climb";
 

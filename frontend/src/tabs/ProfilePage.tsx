@@ -1,6 +1,5 @@
 // src/tabs/ProfilePage.tsx
 import { useEffect, useMemo, useState } from 'react';
-import { Routes, Route, Navigate, useLocation, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import type { UserProfile } from '../types/user';
 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -245,7 +244,7 @@ function EditMeasurementsDialogMetric({
   }, [initial, open]);
 
   const hasAnyValue = useMemo(
-    () => [height, weight, apeIndex, grip].some(v => v !== null && v !== undefined && v !== ''),
+    () => [height, weight, apeIndex, grip].some(v => v !== null && v !== undefined),
     [height, weight, apeIndex, grip]
   );
 

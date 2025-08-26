@@ -29,7 +29,7 @@ export type GradeSystem = {
 }
 
 export interface LocalRoute {
-  id: number;
+  id: string;
   gradeSystem?: number;
   gradeSystemLabel?: string;
   gradeLabel: string;

@@ -17,7 +17,7 @@ import { ProfileTab } from './tabs/ProfilePage';
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [error, setError] = useState<string>('');
+  const [, setError] = useState<string>('');
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -94,7 +94,12 @@ export default function App() {
         <Route path="home" element={<HomeTab />} />
         <Route path="climb" element={<ClimbTab />} />
         <Route path="history" element={<HistoryTab />} />
-        <Route path="profile" element={<ProfileTab userProfile={profile} onLogout={handleLogout} />} />
+        <Route path="profile" element={
+            <RequireAuth>
+              <ProfileTab userProfile={profile!} onLogout={handleLogout} />
+            </RequireAuth>
+          }
+        />
       </Route>
 
       {/* Root redirect */}
@@ -107,14 +112,8 @@ export default function App() {
 }
 
 
-/** Shell layout that draws the tabs and renders active tab via <Outlet/> */
-function AppShell({
-  profile,
-  onLogout,
-}: {
-  profile: UserProfile;
-  onLogout: () => Promise<void>;
-}) {
+
+function AppShell({ profile: _profile, onLogout: _onLogout }: { profile: UserProfile | null; onLogout: () => void }) {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Active tab content */}

@@ -1,0 +1,13 @@
+services:
+  climbge_api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: >
+      gunicorn app:app -w 2 -k gthread
+      -b 0.0.0.0:${APP_PORT:-9001}
+      --forwarded-allow-ips="*" --timeout 60
+    env_file: /opt/climbge/backend.env
+    ports:
+      - "127.0.0.1:9001:${APP_PORT:-9001}"
+    restart: unless-stopped

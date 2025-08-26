@@ -41,7 +41,7 @@ export function EditUserMeasurements({
   }, [initial, open]);
 
   const hasAnyValue = useMemo(() => {
-    return [height, weight, apeIndex, grip].some(v => v !== null && v !== undefined && v !== '');
+    return [height, weight, apeIndex, grip].some(v => v !== null && v !== undefined);
   }, [height, weight, apeIndex, grip]);
 
   function parseNum(v: string): NullableNumber {
