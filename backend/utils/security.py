@@ -19,4 +19,4 @@ def logout_user():
     session.pop(SESSION_KEY, None)
 
 def current_user_id():
-    return session.get(SESSION_KEY)
+    return session[SESSION_KEY]

@@ -1,9 +1,9 @@
-from datetime import date
+from datetime import date, datetime
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation
 from flask import session
 from utils.http import err
-from utils.security import hash_password, verify_password, login_user
+from utils.security import hash_password, verify_password, login_user, current_user_id
 from services.user_profile_service import fetch_user_profile
 from utils.connect_db import pool
 
@@ -14,7 +14,6 @@ def signup_user(data: dict):
     if not username or not password:
         return err("invalid_input", "Username and password are required.", 422)
 
-    from datetime import datetime
     started_str = (data.get("startedClimbing") or "").strip()
     try:
         started_date = datetime.strptime(started_str, "%Y-%m-%d").date()
@@ -135,7 +134,7 @@ def logout_user():
 
 def me_profile():
     try:
-        uid = session.get['user_id']
+        uid = current_user_id()
         if not uid:
             return {"authenticated": False}, 200
         row = fetch_user_profile(uid)
