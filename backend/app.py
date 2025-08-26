@@ -7,6 +7,7 @@ from flask import Flask, jsonify
 from werkzeug.exceptions import HTTPException
 from flasgger import Swagger
 from routes import api_bp
+from flask_cors import CORS
 
 def create_app():
     app = Flask(__name__)
