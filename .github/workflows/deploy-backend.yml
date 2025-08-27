@@ -2,7 +2,7 @@ name: Deploy Backend
 
 on:
   push:
-    branches: ["main"]
+    branches: ["never-run"]
     paths:
       - "backend/**"
       - "docker-compose.yaml"
