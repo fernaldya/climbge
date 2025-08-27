@@ -17,6 +17,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: secrets
     steps:
       - name: SSH to VPS and deploy
         uses: appleboy/ssh-action@v1.2.0
