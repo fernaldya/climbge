@@ -28,24 +28,4 @@ jobs:
           port: ${{ secrets.VPS_SSH_PORT }}
           script: |
             export REPO_SSH_URL=${{ secrets.REPO_SSH_URL }}
-            if [ ! -d /opt/climbge ]; then
-              mkdir -p /opt/climbge
-            fi
-            if [ ! -f /opt/climbge/deploy.sh ]; then
-              cat > /opt/climbge/deploy.sh <<'SH'
-            #!/usr/bin/env bash
-            set -euo pipefail
-            cd /opt/climbge
-            if [ ! -d .git ]; then
-              git clone --depth 1 "${REPO_SSH_URL:-git@github.com:fernaldya/climbge.git}" /opt/climbge
-            else
-              git fetch --all
-              git reset --hard origin/main
-            fi
-            docker compose up -d --build climbge_api
-            docker image prune -f
-            echo "[deploy] OK"
-            SH
-              chmod +x /opt/climbge/deploy.sh
-            fi
             /opt/climbge/deploy.sh
