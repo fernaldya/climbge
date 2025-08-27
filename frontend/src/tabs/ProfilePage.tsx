@@ -182,11 +182,11 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
 
       {/* Settings & Actions (sticky) */}
       <div className="px-2 space-y-3 sticky bottom-20 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <Button variant="outline" className="w-full justify-start gap-3 h-12" onClick={() => setFeedbackDialogOpen(true)}>
+        <Button variant="outline" className="w-full justify-start gap-3 h-12 text-left" onClick={() => setFeedbackDialogOpen(true)}>
           <MessageSquareShare className="h-5 w-5" />
           Let us know how you feel about Climbge
         </Button>
-        <Button variant="outline" className="w-full justify-start gap-3 h-12" onClick={onLogout}>
+        <Button variant="outline" className="w-full justify-start gap-3 h-12 text-left" onClick={onLogout}>
           <LogOut className="h-5 w-5" />
           Log Out
         </Button>
