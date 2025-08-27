@@ -28,4 +28,4 @@ jobs:
           port: ${{ secrets.VPS_SSH_PORT }}
           script: |
             export REPO_SSH_URL=${{ secrets.REPO_SSH_URL }}
-            /opt/climbge/deploy.sh
+            /app/deploy.sh
