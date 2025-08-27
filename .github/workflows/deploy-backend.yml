@@ -28,4 +28,4 @@ jobs:
           port: ${{ secrets.VPS_SSH_PORT }}
           script: |
             export REPO_SSH_URL=${{ secrets.REPO_SSH_URL }}
-            /app/deploy.sh
+            bash -lc '/app/deploy.sh'
