@@ -1,0 +1,50 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "backend/**"
+      - "docker-compose.yaml"
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: climbge-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH to VPS and deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          script: |
+            export REPO_SSH_URL=${{ secrets.REPO_SSH_URL }}
+            if [ ! -d /opt/climbge ]; then
+              mkdir -p /opt/climbge
+            fi
+            if [ ! -f /opt/climbge/deploy.sh ]; then
+              cat > /opt/climbge/deploy.sh <<'SH'
+            #!/usr/bin/env bash
+            set -euo pipefail
+            cd /opt/climbge
+            if [ ! -d .git ]; then
+              git clone --depth 1 "${REPO_SSH_URL:-git@github.com:fernaldya/climbge.git}" /opt/climbge
+            else
+              git fetch --all
+              git reset --hard origin/main
+            fi
+            docker compose up -d --build climbge_api
+            docker image prune -f
+            echo "[deploy] OK"
+            SH
+              chmod +x /opt/climbge/deploy.sh
+            fi
+            /opt/climbge/deploy.sh
