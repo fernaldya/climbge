@@ -15,12 +15,12 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh -s -- -y \
  && uv sync --frozen --no-dev
 
 # now copy backend code
-COPY backend/ /app/backend/
+COPY backend/ /app/climbge/
 
 RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
 USER appuser
 
-WORKDIR /app/backend
+WORKDIR /app/climbge
 EXPOSE 9001
 HEALTHCHECK --interval=30s --timeout=3s --retries=5 CMD \
   curl -fsS "http://127.0.0.1:${APP_PORT:-9001}/api/healthz" || exit 1

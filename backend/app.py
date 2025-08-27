@@ -9,10 +9,12 @@ from flasgger import Swagger
 from routes import api_bp
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
+from utils.logger import setup_logging, install_api_request_logging
 
 def parse_origins(envval: str) -> list[str]:
     return [o.strip() for o in (envval or "").split(",") if o.strip()]
 
+api_logger = setup_logging('climbge-api', os.path.join(os.getenv("LOG_FILE_PATH"), 'climbge.log'))
 
 def create_app():
     app = Flask(__name__)
