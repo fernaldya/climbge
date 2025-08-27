@@ -10,10 +10,8 @@ services:
     env_file: backend/.env.production
     environment:
       APP_PORT: "9001"
-    volumes:
-      - ./logs:/app/climbge/logs
     ports:
-      - "127.0.0.1:9001:9001"
+      - "9001:9001"
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:9001/api/healthz" ]

@@ -1,26 +1,34 @@
-FROM python:3.12-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
-    UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/app/.venv \
-    PATH="/app/.venv/bin:/root/.local/bin:${PATH}"
+FROM python:3.12.0-slim
 
-RUN apt-get update -y && apt-get install -y --no-install-recommends \
-      curl ca-certificates libpq5 && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_PYTHON_PREFERENCE=system
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl ca-certificates libpq5 build-essential gcc libpq-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 WORKDIR /app
 
-# copy ONLY lockfiles first (best cache)
 COPY pyproject.toml uv.lock* ./
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && uv --version \
-    && uv sync --frozen --no-dev
 
-# now copy backend code
-COPY backend/ /app/climbge/
+RUN /root/.local/bin/uv sync --frozen --no-dev
 
-RUN useradd --create-home --uid 10001 appuser && chown -R appuser:appuser /app
+RUN apt-get purge -y build-essential gcc libpq-dev \
+ && apt-get autoremove -y \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m appuser
+
+COPY --chown=appuser:appuser backend/ /app/climbge
+
+ENV PATH="/app/.venv/bin:${PATH}"
+
 USER appuser
 
-WORKDIR /app/climbge
 EXPOSE 9001
-HEALTHCHECK --interval=30s --timeout=3s --retries=5 CMD \
-  curl -fsS "http://127.0.0.1:${APP_PORT:-9001}/api/healthz" || exit 1
+
+WORKDIR /app/climbge
