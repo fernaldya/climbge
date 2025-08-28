@@ -59,6 +59,15 @@ def fetch_last_climb(user_id: str):
                 (user_id,)
             )
             row = cur.fetchone()
+        if not row:
+            last_climb = {
+                "location": None,
+                "climbDate": None,
+                "highestGrade": None,
+                "totalSent": None,
+                "totalAttempted": None,
+            }
+            return last_climb, 200
 
         last_climb = {
             "location": row["location"],
@@ -90,6 +99,13 @@ def fetch_weekly_stats(user_id: str):
                 (user_id,)
             )
             row = cur.fetchone()
+        if not row:
+            weekly_stats = {
+                "totalSession": None,
+                "totalSent": None,
+                "totalAttempted": None,
+            }
+            return weekly_stats, 200
 
         weekly_stats = {
             "totalSession": row["total_session"],
