@@ -162,8 +162,8 @@ export function HomeTab() {
           <div className="p-2 rounded-lg bg-white">
             <Timer className="h-5 w-5 text-green-500" />
           </div>
-          <div className="mt-3 font-semibold">Timer</div>
-          <div className="text-sm text-orange-700 text-left">Hangboard timer</div>
+          <div className="mt-3 font-semibold">Hangboard Timer</div>
+          <div className="text-sm text-orange-700 text-left">Sending soon</div>
         </button>
       </div>
 

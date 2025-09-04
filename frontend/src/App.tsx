@@ -103,7 +103,7 @@ export default function App() {
       </Route>
 
       {/* Root redirect */}
-      <Route path="/" element={<Navigate to={profile ? '/app/history' : '/login'} replace />} />
+      <Route path="/" element={<Navigate to={profile ? '/app/home' : '/login'} replace />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
