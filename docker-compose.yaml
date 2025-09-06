@@ -15,7 +15,7 @@ services:
       - "9001:9001"
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:9001/api/healthz" ]
+      test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:9001/healthz" ]
       interval: 30s
       timeout: 5s
       retries: 5
