@@ -7,7 +7,6 @@ services:
       gunicorn app:app -w 2 -k gthread
       -b 0.0.0.0:${APP_PORT:-9001}
       --forwarded-allow-ips="*" --timeout 60
-    env_file: backend/.env
     volumes:
       - /app/.env:/app/.env:ro
     environment:
