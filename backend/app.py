@@ -1,7 +1,9 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
+from dotenv import load_dotenv
+env_file = os.environ.get('ENV_FILE', '.env')
+if os.path.exists(env_file):
+    load_dotenv(f'{os.environ.get('ENV_DIR')}')
+
 import traceback
 from flask import Flask, jsonify, request, abort
 from werkzeug.exceptions import HTTPException
