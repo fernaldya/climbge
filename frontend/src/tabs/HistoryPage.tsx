@@ -35,8 +35,11 @@ export function HistoryTab() {
 
         <Card className="rounded-3xl bg-white shadow-sm ring-1 ring-black/5">
           <CardContent className="p-5">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Recent Sessions</h2>
+              <span className="text-xs text-muted-foreground italic">
+                *Updates every 30 minutes
+              </span>
             </div>
 
             {err && (
