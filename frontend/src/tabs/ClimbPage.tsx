@@ -330,7 +330,7 @@ export function ClimbTab() {
               type="number"
               min={0}
               value={timeGoalMin}
-              onChange={(e) => setTimeGoalMin(e.target.value)}  // OK now
+              onChange={(e) => setTimeGoalMin(e.target.value)}
               onBlur={() => {
                 if (timeGoalMin === "") setTimeGoalMin(0);
               }}
@@ -343,6 +343,9 @@ export function ClimbTab() {
               min={0}
               value={routeGoal}
               onChange={(e) => setRouteGoal(Number(e.target.value))}
+              onBlur={() => {
+                if (routeGoal === "") setRouteGoal(0);
+              }}
             />
           </div>
           <div className="col-span-2">
