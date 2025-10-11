@@ -55,6 +55,8 @@ def create_app():
                 abort(403)
     app.register_blueprint(api_bp)
 
+    install_api_request_logging(app, api_logger)
+
     @app.get("/healthz")
     def healthz():
         return jsonify(status="ok")

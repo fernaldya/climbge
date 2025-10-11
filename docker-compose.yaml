@@ -9,6 +9,7 @@ services:
       --forwarded-allow-ips="*" --timeout 60
     volumes:
       - /app/.env:/app/.env:ro
+      - /logs/climbge:/logs:rw
     environment:
       - ENV_DIR=/app/.env
     ports:

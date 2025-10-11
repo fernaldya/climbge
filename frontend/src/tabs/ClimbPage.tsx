@@ -52,7 +52,7 @@ export function ClimbTab() {
   const timerRef = useRef<number | null>(null);
 
   // Goals
-  const [timeGoalMin, setTimeGoalMin] = useState<number>(120);
+  const [timeGoalMin, setTimeGoalMin] = useState<number | string>(120);
   const [routeGoal, setRouteGoal] = useState<number>(15);
 
   // Grade systems from DB
@@ -330,7 +330,10 @@ export function ClimbTab() {
               type="number"
               min={0}
               value={timeGoalMin}
-              onChange={(e) => setTimeGoalMin(Number(e.target.value) || 0)}
+              onChange={(e) => setTimeGoalMin(e.target.value)}  // OK now
+              onBlur={() => {
+                if (timeGoalMin === "") setTimeGoalMin(0);
+              }}
             />
           </div>
           <div>
@@ -523,7 +526,7 @@ export function ClimbTab() {
                 placeholder="Route color, wall, etc."
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
-                maxLength={15}
+                maxLength={25}
               />
             </div>
           </div>
