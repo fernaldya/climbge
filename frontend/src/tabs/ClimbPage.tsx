@@ -53,7 +53,7 @@ export function ClimbTab() {
 
   // Goals
   const [timeGoalMin, setTimeGoalMin] = useState<number | string>(120);
-  const [routeGoal, setRouteGoal] = useState<number>(15);
+  const [routeGoal, setRouteGoal] = useState<number | string>(8);
 
   // Grade systems from DB
   const [systems, setSystems] = useState<GradeSystem[]>([]);
@@ -342,7 +342,7 @@ export function ClimbTab() {
               type="number"
               min={0}
               value={routeGoal}
-              onChange={(e) => setRouteGoal(Number(e.target.value) || 0)}
+              onChange={(e) => setRouteGoal(Number(e.target.value))}
             />
           </div>
           <div className="col-span-2">
