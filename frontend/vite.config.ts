@@ -17,7 +17,29 @@ export default defineConfig({
         scope: '/',
         theme_color: '#e97316',
         background_color: '#e97316',
-        // icons: [] // add 192x192 + 512x512 (maskable) later
+        icons: [
+            {
+                "src": "/climbge.png",
+                "sizes": "192x192",
+                "type": "image/png"
+            },
+            {
+                "src": "/climbge-384.png",
+                "sizes": "384x384",
+                "type": "image/png"
+            },
+            {
+                "src": "/climbge-512.png",
+                "sizes": "512x512",
+                "type": "image/png"
+            },
+            {
+                "src": "/climbge-512-maskable.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "maskable"
+            }
+        ]
       },
       workbox: {
         navigateFallback: '/index.html',
