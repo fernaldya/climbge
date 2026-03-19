@@ -181,6 +181,6 @@ def commit_session_service(user_id: str, payload: dict):
     except ValueError as e:
         return {"error": str(e)}, 400
 
-    except Exception:
-        # TODO: add logging here for visibility
+    except Exception as e:
+        import traceback; traceback.print_exc()
         return {"error": "Something happened while trying to save the session."}, 500

@@ -56,10 +56,11 @@ export function DialogContent({
       />
 
       {/* Centered content (mobile bottom-sheet friendly sizes) */}
-      <div className="absolute inset-0 z-10 flex items-center justify-center p-4">
+      <div className="absolute inset-0 z-10 flex items-center justify-center p-4" onClick={close}>
         <div
           role="dialog"
           aria-modal="true"
+          onClick={(e) => e.stopPropagation()}
           className={cn(
             // Card
             "w-[min(92vw,28rem)] rounded-2xl border bg-white text-black p-6 shadow-2xl",

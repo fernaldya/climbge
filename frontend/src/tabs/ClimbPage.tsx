@@ -50,6 +50,8 @@ export function ClimbTab() {
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0); // seconds
   const timerRef = useRef<number | null>(null);
+  const runOriginRef = useRef<number | null>(null); // Date.now() - elapsed*1000 when running started
+  const runningRef = useRef(false);
 
   // Goals
   const [timeGoalMin, setTimeGoalMin] = useState<number | string>(120);
@@ -109,10 +111,14 @@ export function ClimbTab() {
 
   // Timer ticker
   useEffect(() => {
+    runningRef.current = running;
     if (!running) {
       if (timerRef.current) cancelAnimationFrame(timerRef.current);
+      runOriginRef.current = null;
       return;
     }
+    // Record wall-clock origin so we can recover after backgrounding
+    runOriginRef.current = Date.now() - elapsed * 1000;
     let last = performance.now();
     const tick = (t: number) => {
       const dt = t - last;
@@ -124,7 +130,18 @@ export function ClimbTab() {
     return () => {
       if (timerRef.current) cancelAnimationFrame(timerRef.current);
     };
-  }, [running]);
+  }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Snap elapsed to wall-clock time when app comes back from background
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && runningRef.current && runOriginRef.current !== null) {
+        setElapsed((Date.now() - runOriginRef.current) / 1000);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
 
   const hhmmss = useMemo(() => {
     const s = Math.floor(elapsed);
@@ -151,11 +168,11 @@ export function ClimbTab() {
   }
 
   function addRouteClick() {
-    // default to first system if available, else "Other"
-    const firstId = systems[0]?.gradeId ?? 999;
-    setGsId(firstId);
+    const saved = localStorage.getItem(LS_KEYS.DEFAULT_GS);
+    const lastId = saved ? Number(saved) : (systems[0]?.gradeId ?? 999);
+    setGsId(lastId);
     setCustomGs("");
-    const preset = byId.get(firstId)?.grades ?? [];
+    const preset = byId.get(lastId)?.grades ?? [];
     setGrade(preset[0] ?? "");
     setDesc("");
     setOpenAdd(true);
@@ -470,6 +487,7 @@ export function ClimbTab() {
                   onValueChange={(v) => {
                     const next = Number(v);
                     setGsId(next);
+                    localStorage.setItem(LS_KEYS.DEFAULT_GS, String(next));
                     if (next !== 999) setCustomGs("");
                     const preset = byId.get(next)?.grades ?? [];
                     setGrade(preset[0] ?? "");
