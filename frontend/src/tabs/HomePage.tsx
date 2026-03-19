@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "../components/ui/card";
 import { Skeleton } from "../components/ui/skeleton";
-import { TrendingUp, Trophy, RotateCcw, BicepsFlexed, Calendar, MapPin, Timer } from "lucide-react";
+import { TrendingUp, Trophy, RotateCcw, BicepsFlexed, Calendar, MapPin } from "lucide-react";
 import { apiLastClimb, apiWeeklySummary } from "../lib/api";
+import { HangboardTimer } from "../components/HangboardTimer";
 import type { WeeklyClimbSummary, LastClimb } from "../types/climb";
 
 
@@ -158,13 +159,7 @@ export function HomeTab() {
 
       {/* OTW feature */}
       <div className="mt-6 grid grid-cols-2 gap-4">
-        <button className="flex flex-col items-start p-4 rounded-xl border border-green-200 bg-green-50 hover:opacity-90 transition">
-          <div className="p-2 rounded-lg bg-white">
-            <Timer className="h-5 w-5 text-green-500" />
-          </div>
-          <div className="mt-3 font-semibold">Hangboard Timer</div>
-          <div className="text-sm text-orange-700 text-left">Sending soon</div>
-        </button>
+        <HangboardTimer />
       </div>
 
       {/*/!* Feature grid - dummy buttons *!/*/}

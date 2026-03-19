@@ -53,6 +53,7 @@ export function ClimbTab() {
   const runOriginRef = useRef<number | null>(null); // Date.now() - elapsed*1000 when running started
   const runningRef = useRef(false);
 
+
   // Goals
   const [timeGoalMin, setTimeGoalMin] = useState<number | string>(120);
   const [routeGoal, setRouteGoal] = useState<number | string>(8);
