@@ -134,7 +134,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </div>
 
               <label style={labelStyle}>Password</label>
-              <div style={{ position: 'relative', marginBottom: 20 }}>
+              <div style={{ position: 'relative', marginBottom: 8 }}>
                 <span style={iconStyle}>◈</span>
                 <input
                   style={{ ...inputStyle, paddingRight: 42 }}
@@ -153,6 +153,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
+              </div>
+              <div style={{ textAlign: 'right', marginBottom: 16 }}>
+                <Link to="/forgot-password" style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>Forgot password?</Link>
               </div>
 
               {loginError && (
@@ -221,7 +224,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </div>
 
               <label style={labelStyle}>Password</label>
-              <div style={{ position: 'relative', marginBottom: 28 }}>
+              <div style={{ position: 'relative', marginBottom: 8 }}>
                 <span style={iconStyle}>◈</span>
                 <input
                   style={{ ...inputStyle, paddingRight: 42 }}
@@ -240,6 +243,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
+              </div>
+              <div style={{ textAlign: 'right', marginBottom: 20 }}>
+                <Link to="/forgot-password" style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>Forgot password?</Link>
               </div>
 
               {loginError && (
