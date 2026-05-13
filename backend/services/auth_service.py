@@ -34,6 +34,7 @@ def signup_user(data: dict):
     _, addr = parseaddr(email)
     if not addr or "@" not in addr or addr.startswith("@") or addr.endswith("@"):
         return err("invalid_input", "Invalid email address.", 422)
+    email = addr.lower()
     name = (data.get("name") or "").strip() or None
     age_val = data.get("age")
     age = None
