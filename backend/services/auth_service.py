@@ -1,3 +1,4 @@
+import hashlib
 import os
 import secrets
 from datetime import date, datetime, timezone, timedelta
@@ -160,6 +161,7 @@ def request_password_reset(email: str, username: str):
         return {"ok": True}, 200
 
     token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
     try:
@@ -177,7 +179,7 @@ def request_password_reset(email: str, username: str):
                 INSERT INTO public.password_reset_tokens (token, user_id, expires_at)
                 VALUES (%s, %s, %s)
                 """,
-                (token, row["user_id"], expires_at),
+                (token_hash, row["user_id"], expires_at),
             )
     except Exception:
         return err("db_error", "Could not create reset token.", 500)
@@ -196,40 +198,29 @@ def request_password_reset(email: str, username: str):
 def reset_password_with_token(token: str, new_password: str):
     if not token or not new_password:
         return err("invalid_input", "Token and new password are required.", 422)
+    if len(new_password) < 6:
+        return err("invalid_input", "New password must be at least 6 characters.", 422)
 
-    try:
-        with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                """
-                SELECT user_id, expires_at, used
-                FROM public.password_reset_tokens
-                WHERE token = %s
-                LIMIT 1
-                """,
-                (token,),
-            )
-            row = cur.fetchone()
-    except Exception:
-        return err("db_error", "Database error.", 500)
-
-    if not row:
-        return err("invalid_token", "Invalid or expired reset link.", 400)
-    if row["used"]:
-        return err("token_used", "This reset link is invalid.", 400)
-    if row["expires_at"] < datetime.now(timezone.utc):
-        return err("token_expired", "This reset link has expired.", 400)
-
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
     pwd_hash = hash_password(new_password)
 
     try:
-        with pool.connection() as conn, conn.transaction(), conn.cursor() as cur:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                UPDATE public.password_reset_tokens
+                SET used = TRUE
+                WHERE token = %s AND used = FALSE AND expires_at > now()
+                RETURNING user_id
+                """,
+                (token_hash,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return err("invalid_token", "Invalid or expired reset link.", 400)
             cur.execute(
                 "UPDATE public.users SET password = %s WHERE user_id = %s",
                 (pwd_hash, row["user_id"]),
-            )
-            cur.execute(
-                "UPDATE public.password_reset_tokens SET used = TRUE WHERE token = %s",
-                (token,),
             )
     except Exception:
         return err("db_error", "Could not update password.", 500)
