@@ -3,12 +3,12 @@ export type SignUpData = {
   password: string;
   confirmPassword: string;
   startedClimbing: string;
-  name?: string
+  email: string;
+  name?: string;
   age?: string;
   sex?: string;
   homeCity?: string;
   homeGym?: string;
-  email?: string;
 };
 
 export type UserProfile = {
