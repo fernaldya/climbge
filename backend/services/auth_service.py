@@ -3,6 +3,7 @@ import logging
 import os
 import secrets
 from datetime import date, datetime, timezone, timedelta
+from email.utils import parseaddr
 
 logger = logging.getLogger("climbge-api")
 from psycopg.rows import dict_row
@@ -30,6 +31,9 @@ def signup_user(data: dict):
     email = (data.get("email") or "").strip()
     if not email:
         return err("invalid_input", "Email is required.", 422)
+    _, addr = parseaddr(email)
+    if not addr or "@" not in addr or addr.startswith("@") or addr.endswith("@"):
+        return err("invalid_input", "Invalid email address.", 422)
     name = (data.get("name") or "").strip() or None
     age_val = data.get("age")
     age = None
@@ -188,7 +192,7 @@ def request_password_reset(email: str, username: str):
                 (token_hash, row["user_id"], expires_at),
             )
     except Exception:
-        logger.error("password_reset: failed to store token user_id=%s", row["user_id"], exc_info=True)
+        logger.error("password_reset: failed to store reset token", exc_info=True)
         return {"ok": True}, 200
 
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
@@ -197,7 +201,7 @@ def request_password_reset(email: str, username: str):
     try:
         send_password_reset_email(row["email"], reset_link)
     except Exception:
-        logger.error("password_reset: failed to send email to=%s", row["email"], exc_info=True)
+        logger.error("password_reset: failed to send reset email", exc_info=True)
 
     return {"ok": True}, 200
 
@@ -209,7 +213,6 @@ def reset_password_with_token(token: str, new_password: str):
         return err("invalid_input", "New password must be at least 6 characters.", 422)
 
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    pwd_hash = hash_password(new_password)
 
     try:
         with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
@@ -225,6 +228,7 @@ def reset_password_with_token(token: str, new_password: str):
             row = cur.fetchone()
             if not row:
                 return err("invalid_token", "Invalid or expired reset link.", 400)
+            pwd_hash = hash_password(new_password)
             cur.execute(
                 "UPDATE public.users SET password = %s WHERE user_id = %s",
                 (pwd_hash, row["user_id"]),
