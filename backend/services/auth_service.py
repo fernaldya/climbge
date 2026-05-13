@@ -1,9 +1,12 @@
-from datetime import date, datetime
+import os
+import secrets
+from datetime import date, datetime, timezone, timedelta
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation
 from flask import session
 from utils.http import err
 from utils.security import hash_password, verify_password, login_user, current_user_id
+from utils.mail import send_password_reset_email
 from services.user_profile_service import fetch_user_profile
 from utils.connect_db import pool
 
@@ -20,7 +23,9 @@ def signup_user(data: dict):
     except ValueError:
         return err("invalid_started_climbing", "startedClimbing must be 'YYYY-MM-DD'.", 422)
 
-    email = (data.get("email") or "").strip() or None
+    email = (data.get("email") or "").strip()
+    if not email:
+        return err("invalid_input", "Email is required.", 422)
     name = (data.get("name") or "").strip() or None
     age_val = data.get("age")
     age = None
@@ -127,6 +132,110 @@ def login_with_password(username: str, password: str):
     session["user_id"] = str(row["user_id"])
     session.permanent = True
     return {"ok": True, "profile": profile}, 200
+
+def request_password_reset(email: str, username: str):
+    if not email and not username:
+        return err("invalid_input", "Email or username is required.", 422)
+
+    try:
+        with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT user_id, email
+                FROM public.vw_pass_reset_fetch
+                WHERE (
+                    (%(email)s <> '' AND email = %(email)s) OR
+                    (%(username)s <> '' AND username = %(username)s)
+                )
+                LIMIT 1
+                """,
+                {"email": email, "username": username},
+            )
+            row = cur.fetchone()
+    except Exception:
+        return err("db_error", "Database error.", 500)
+
+    # Return success regardless to prevent enumeration
+    if not row or not row["email"]:
+        return {"ok": True}, 200
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+
+    try:
+        with pool.connection() as conn, conn.transaction(), conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE public.password_reset_tokens
+                SET used = TRUE
+                WHERE user_id = %s AND used = FALSE
+                """,
+                (row["user_id"],),
+            )
+            cur.execute(
+                """
+                INSERT INTO public.password_reset_tokens (token, user_id, expires_at)
+                VALUES (%s, %s, %s)
+                """,
+                (token, row["user_id"], expires_at),
+            )
+    except Exception:
+        return err("db_error", "Could not create reset token.", 500)
+
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    reset_link = f"{frontend_url}/reset-password?token={token}"
+
+    try:
+        send_password_reset_email(row["email"], reset_link)
+    except Exception:
+        return err("mail_error", "Could not send reset email.", 500)
+
+    return {"ok": True}, 200
+
+
+def reset_password_with_token(token: str, new_password: str):
+    if not token or not new_password:
+        return err("invalid_input", "Token and new password are required.", 422)
+
+    try:
+        with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT user_id, expires_at, used
+                FROM public.password_reset_tokens
+                WHERE token = %s
+                LIMIT 1
+                """,
+                (token,),
+            )
+            row = cur.fetchone()
+    except Exception:
+        return err("db_error", "Database error.", 500)
+
+    if not row:
+        return err("invalid_token", "Invalid or expired reset link.", 400)
+    if row["used"]:
+        return err("token_used", "This reset link is invalid.", 400)
+    if row["expires_at"] < datetime.now(timezone.utc):
+        return err("token_expired", "This reset link has expired.", 400)
+
+    pwd_hash = hash_password(new_password)
+
+    try:
+        with pool.connection() as conn, conn.transaction(), conn.cursor() as cur:
+            cur.execute(
+                "UPDATE public.users SET password = %s WHERE user_id = %s",
+                (pwd_hash, row["user_id"]),
+            )
+            cur.execute(
+                "UPDATE public.password_reset_tokens SET used = TRUE WHERE token = %s",
+                (token,),
+            )
+    except Exception:
+        return err("db_error", "Could not update password.", 500)
+
+    return {"ok": True}, 200
+
 
 def logout_user():
     session.clear()
