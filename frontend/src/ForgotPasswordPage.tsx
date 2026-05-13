@@ -96,11 +96,13 @@ export function ForgotPasswordPage() {
             ) : (
               <form onSubmit={handleSubmit}>
                 <div style={{ marginBottom: 14 }} />
-                <label style={labelStyle}>Email address</label>
+                <label htmlFor="fp-email-mobile" style={labelStyle}>Email address</label>
                 <div style={{ position: 'relative', marginBottom: 14 }}>
                   <input
+                    id="fp-email-mobile"
                     style={inputStyle}
                     type="email"
+                    autoComplete="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -115,11 +117,13 @@ export function ForgotPasswordPage() {
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
                 </div>
 
-                <label style={labelStyle}>Username</label>
+                <label htmlFor="fp-username-mobile" style={labelStyle}>Username</label>
                 <div style={{ position: 'relative', marginBottom: 20 }}>
                   <input
+                    id="fp-username-mobile"
                     style={inputStyle}
                     type="text"
+                    autoComplete="username"
                     placeholder="your handle"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -129,7 +133,7 @@ export function ForgotPasswordPage() {
                 </div>
 
                 {error && (
-                  <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>
+                  <div role="alert" aria-live="assertive" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>
                     {error}
                   </div>
                 )}
@@ -185,11 +189,13 @@ export function ForgotPasswordPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
-                <label style={labelStyle}>Email address</label>
+                <label htmlFor="fp-email-desktop" style={labelStyle}>Email address</label>
                 <div style={{ position: 'relative', marginBottom: 14 }}>
                   <input
+                    id="fp-email-desktop"
                     style={inputStyle}
                     type="email"
+                    autoComplete="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -204,11 +210,13 @@ export function ForgotPasswordPage() {
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
                 </div>
 
-                <label style={labelStyle}>Username</label>
+                <label htmlFor="fp-username-desktop" style={labelStyle}>Username</label>
                 <div style={{ position: 'relative', marginBottom: 28 }}>
                   <input
+                    id="fp-username-desktop"
                     style={inputStyle}
                     type="text"
+                    autoComplete="username"
                     placeholder="your handle"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -218,7 +226,7 @@ export function ForgotPasswordPage() {
                 </div>
 
                 {error && (
-                  <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>
+                  <div role="alert" aria-live="assertive" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>
                     {error}
                   </div>
                 )}
