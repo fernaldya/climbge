@@ -43,8 +43,8 @@ export function ResetPasswordPage() {
       await apiResetPassword(token, password);
       navigate('/login', { replace: true, state: { passwordReset: true } });
     } catch (err: unknown) {
-      console.error('reset password failed:', err);
-      setError('Unable to reset password. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Something went wrong.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -85,13 +85,11 @@ export function ResetPasswordPage() {
 
   const formContent = (
     <form onSubmit={handleSubmit}>
-      <label htmlFor="new-password" style={labelStyle}>New password</label>
+      <label style={labelStyle}>New password</label>
       <div style={{ position: 'relative', marginBottom: 14 }}>
         <input
-          id="new-password"
           style={inputStyle}
           type={showPassword ? 'text' : 'password'}
-          autoComplete="new-password"
           placeholder="••••••••"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -108,13 +106,11 @@ export function ResetPasswordPage() {
         </button>
       </div>
 
-      <label htmlFor="confirm-password" style={labelStyle}>Confirm password</label>
+      <label style={labelStyle}>Confirm password</label>
       <div style={{ position: 'relative', marginBottom: 20 }}>
         <input
-          id="confirm-password"
           style={inputStyle}
           type={showConfirm ? 'text' : 'password'}
-          autoComplete="new-password"
           placeholder="••••••••"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
@@ -132,7 +128,7 @@ export function ResetPasswordPage() {
       </div>
 
       {error && (
-        <div role="alert" aria-live="assertive" aria-atomic="true" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>
+        <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>
           {error}
         </div>
       )}
