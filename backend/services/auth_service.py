@@ -1,7 +1,10 @@
 import hashlib
+import logging
 import os
 import secrets
 from datetime import date, datetime, timezone, timedelta
+
+logger = logging.getLogger("climbge-api")
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation
 from flask import session
@@ -140,18 +143,21 @@ def request_password_reset(email: str, username: str):
 
     try:
         with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(
-                """
-                SELECT user_id, email
-                FROM public.vw_pass_reset_fetch
-                WHERE (
-                    (%(email)s <> '' AND email = %(email)s) OR
-                    (%(username)s <> '' AND username = %(username)s)
+            if email and username:
+                cur.execute(
+                    "SELECT user_id, email FROM public.vw_pass_reset_fetch WHERE email = %s AND username = %s LIMIT 1",
+                    (email, username),
                 )
-                LIMIT 1
-                """,
-                {"email": email, "username": username},
-            )
+            elif email:
+                cur.execute(
+                    "SELECT user_id, email FROM public.vw_pass_reset_fetch WHERE email = %s LIMIT 1",
+                    (email,),
+                )
+            else:
+                cur.execute(
+                    "SELECT user_id, email FROM public.vw_pass_reset_fetch WHERE username = %s LIMIT 1",
+                    (username,),
+                )
             row = cur.fetchone()
     except Exception:
         return err("db_error", "Database error.", 500)
@@ -182,7 +188,8 @@ def request_password_reset(email: str, username: str):
                 (token_hash, row["user_id"], expires_at),
             )
     except Exception:
-        return err("db_error", "Could not create reset token.", 500)
+        logger.error("password_reset: failed to store token user_id=%s", row["user_id"], exc_info=True)
+        return {"ok": True}, 200
 
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
     reset_link = f"{frontend_url}/reset-password?token={token}"
@@ -190,7 +197,7 @@ def request_password_reset(email: str, username: str):
     try:
         send_password_reset_email(row["email"], reset_link)
     except Exception:
-        return err("mail_error", "Could not send reset email.", 500)
+        logger.error("password_reset: failed to send email to=%s", row["email"], exc_info=True)
 
     return {"ok": True}, 200
 
