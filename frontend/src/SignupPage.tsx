@@ -55,8 +55,9 @@ export function SignupPage({ onSignup }: SignupPageProps) {
     if (data.password.length < 6) return setError('Password must be at least 6 characters'), false;
     if (data.password !== data.confirmPassword) return setError('Passwords do not match'), false;
     if (!data.startedClimbing) return setError('Please select when you started climbing'), false;
-    if (!data.email.trim()) return setError('Please enter your email address'), false;
-    if (!/\S+@\S+\.\S+/.test(data.email)) return setError('Please enter a valid email address'), false;
+    const normalizedEmail = data.email.trim().toLowerCase();
+    if (!normalizedEmail) return setError('Please enter your email address'), false;
+    if (!/\S+@\S+\.\S+/.test(normalizedEmail)) return setError('Please enter a valid email address'), false;
     return true;
   };
 
@@ -71,8 +72,9 @@ export function SignupPage({ onSignup }: SignupPageProps) {
     if (!validateStep1()) return;
     const started = `${data.startedClimbing}-01`;
     try {
+      const normalizedEmail = data.email.trim().toLowerCase();
       const res = await apiSignup(data.username.trim(), data.password, started, {
-        email: data.email,
+        email: normalizedEmail,
         name: data.name || undefined,
         age: data.age || undefined,
         sex: data.sex || undefined,
