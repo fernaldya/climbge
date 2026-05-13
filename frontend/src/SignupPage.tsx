@@ -55,6 +55,8 @@ export function SignupPage({ onSignup }: SignupPageProps) {
     if (data.password.length < 6) return setError('Password must be at least 6 characters'), false;
     if (data.password !== data.confirmPassword) return setError('Passwords do not match'), false;
     if (!data.startedClimbing) return setError('Please select when you started climbing'), false;
+    if (!data.email.trim()) return setError('Please enter your email address'), false;
+    if (!/\S+@\S+\.\S+/.test(data.email)) return setError('Please enter a valid email address'), false;
     return true;
   };
 
@@ -70,7 +72,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
     const started = `${data.startedClimbing}-01`;
     try {
       const res = await apiSignup(data.username.trim(), data.password, started, {
-        email: data.email || undefined,
+        email: data.email,
         name: data.name || undefined,
         age: data.age || undefined,
         sex: data.sex || undefined,
@@ -206,6 +208,12 @@ export function SignupPage({ onSignup }: SignupPageProps) {
                   <input style={{ ...inputStyle, colorScheme: 'dark' }} type="month" max={startedMax} value={data.startedClimbing} onChange={set('startedClimbing')} {...focusHandlers} />
                 </div>
 
+                <label style={labelStyle}>Email <span style={{ color: '#ef4444' }}>*</span></label>
+                <div style={{ position: 'relative', marginBottom: 14 }}>
+                  <span style={iconStyle}>@</span>
+                  <input style={inputStyle} type="email" placeholder="your@email.com" value={data.email} onChange={set('email')} {...focusHandlers} />
+                </div>
+
                 {error && <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 12px', color: '#fca5a5', fontSize: 13, marginBottom: 14 }}>{error}</div>}
 
                 <div style={{ marginBottom: 20 }} />
@@ -221,12 +229,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
                   <span style={{ display: 'inline-block', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', background: 'rgba(247,166,45,0.15)', color: '#F7A62D', borderRadius: 4, padding: '2px 6px', marginLeft: 6 }}>Optional</span>
                 </div>
                 <div style={{ marginBottom: 14 }} />
-
-                <label style={labelStyle}>Email</label>
-                <div style={{ position: 'relative', marginBottom: 14 }}>
-                  <span style={iconStyle}>@</span>
-                  <input style={inputStyle} type="email" placeholder="your@email.com" value={data.email} onChange={set('email')} {...focusHandlers} />
-                </div>
 
                 <label style={labelStyle}>Name</label>
                 <div style={{ position: 'relative', marginBottom: 14 }}>
@@ -345,6 +347,13 @@ export function SignupPage({ onSignup }: SignupPageProps) {
                   </button>
                 </div>
               </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Email <span style={{ color: '#ef4444' }}>*</span></label>
+                <div style={{ position: 'relative', marginBottom: 12 }}>
+                  <span style={iconStyle}>@</span>
+                  <input style={inputStyle} type="email" placeholder="your@email.com" value={data.email} onChange={set('email')} {...focusHandlers} />
+                </div>
+              </div>
             </div>
 
             {/* Optional divider */}
@@ -355,13 +364,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
-              <div>
-                <label style={labelStyle}>Email</label>
-                <div style={{ position: 'relative', marginBottom: 12 }}>
-                  <span style={iconStyle}>@</span>
-                  <input style={inputStyle} type="email" placeholder="your@email.com" value={data.email} onChange={set('email')} {...focusHandlers} />
-                </div>
-              </div>
               <div>
                 <label style={labelStyle}>Name</label>
                 <div style={{ position: 'relative', marginBottom: 12 }}>

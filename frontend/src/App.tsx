@@ -5,6 +5,8 @@ import type { UserProfile } from './types/user';
 import { apiMe, apiLogout } from './lib/api';
 import { LoginPage } from './LoginPage';
 import { SignupPage } from './SignupPage';
+import { ForgotPasswordPage } from './ForgotPasswordPage';
+import { ResetPasswordPage } from './ResetPasswordPage';
 import { cn } from './components/ui/utils';
 import { Home, Mountain, History, User } from "lucide-react";
 
@@ -79,6 +81,9 @@ export default function App() {
           </RedirectIfAuthed>
         }
       />
+
+      <Route path="/forgot-password" element={<RedirectIfAuthed><ForgotPasswordPage /></RedirectIfAuthed>} />
+      <Route path="/reset-password" element={<RedirectIfAuthed><ResetPasswordPage /></RedirectIfAuthed>} />
 
       {/* Protected tabbed app */}
       <Route

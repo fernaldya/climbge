@@ -41,7 +41,7 @@ function mapResponseToError(res: Response, payload: any): ApiError {
   if (res.status === 404) {
     return new ApiError('NOT_FOUND', 'Resource not found.', res.status);
   }
-  const msg = (payload && payload.error) || 'Request failed.';
+  const msg = payload?.error?.message || 'Request failed.';
   return new ApiError('UNKNOWN', msg, res.status);
 }
 
@@ -177,6 +177,37 @@ export async function apiFetchGradeSystems(): Promise<GradeSystem[]> {
     return (await res.json()) as GradeSystem[];
   } catch {
     return [];
+  }
+}
+
+export async function apiForgotPassword(email: string, username: string) {
+  try {
+    const res = await fetch(joinURL('/api/forgot-password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email || undefined,
+        username: username || undefined,
+      }),
+    });
+    return json<{ ok: boolean }>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
+  }
+}
+
+export async function apiResetPassword(token: string, newPassword: string) {
+  try {
+    const res = await fetch(joinURL('/api/reset-password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, new_password: newPassword }),
+    });
+    return json<{ ok: boolean }>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
   }
 }
 
