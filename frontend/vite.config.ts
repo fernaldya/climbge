@@ -51,17 +51,10 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         navigateFallback: '/index.html',
-        // Do NOT cache your separate API origin
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/api\.climbge\.com\/.*$/i,
+            urlPattern: /\/api\//,
             handler: 'NetworkOnly',
-            method: 'GET',
-          },
-          {
-            urlPattern: /^https:\/\/api\.climbge\.com\/.*$/i,
-            handler: 'NetworkOnly',
-            method: 'POST',
           },
         ],
       },
