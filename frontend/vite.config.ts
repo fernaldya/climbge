@@ -53,7 +53,7 @@ export default defineConfig(({ mode }) => ({
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+            urlPattern: /\/api\//,
             handler: 'NetworkOnly',
           },
         ],
