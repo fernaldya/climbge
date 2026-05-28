@@ -13,6 +13,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
 from utils.logger import setup_logging, install_api_request_logging
 
+
 def parse_origins(envval: str) -> list[str]:
     return [o.strip() for o in (envval or "").split(",") if o.strip()]
 
@@ -69,6 +70,18 @@ def create_app():
         return jsonify(error={"code": "server_error", "message": "Something went wrong."}), 500
 
     return app
+
+if os.getenv("FLASK_ENV") == "production":
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=os.getenv("SENTRY_DSN"),
+        # Add data like request headers and IP for users,
+        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+        send_default_pii=True,
+        # Enable sending logs to Sentry
+        enable_logs=True,
+    )
+
 
 app = create_app()
 if os.getenv("FLASK_ENV") == "development":
