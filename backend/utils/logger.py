@@ -2,7 +2,7 @@
 import logging, os, sys, time
 from logging.handlers import TimedRotatingFileHandler
 from typing import Optional
-from flask import Flask, g, request
+from flask import Flask, g, request, session
 
 def setup_logging(
     name: str,
@@ -54,8 +54,7 @@ def install_api_request_logging(app: Flask, logger: logging.Logger) -> None:
         start: Optional[float] = getattr(g, "_req_start", None)
         dur_ms = (time.perf_counter() - start) * 1000 if start else None
 
-        # If you attach user info during auth, set g.user_id there.
-        user_id = getattr(g, "user_id", "-")
+        user_id = getattr(g, "user_id", None) or session.get("user_id", "-")
 
         # Prefer CF-Connecting-IP/X-Forwarded-For behind proxies
         ip = (

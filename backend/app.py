@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 env_file = os.environ.get('ENV_DIR', '.env')
 if os.path.exists(env_file):
-    load_dotenv(f'{os.environ.get('ENV_DIR')}')
+    load_dotenv(env_file)
 
 import traceback
 from flask import Flask, jsonify, request, abort
