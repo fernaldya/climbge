@@ -2,6 +2,8 @@ from typing import Any, Dict, List, Optional
 from psycopg.rows import dict_row
 from utils.connect_db import pool
 from utils.parse_timestamp import parse_ts
+from collections import defaultdict
+import json
 
 
 # ---------- Grade Systems ----------
@@ -184,3 +186,39 @@ def commit_session_service(user_id: str, payload: dict):
     except Exception as e:
         import traceback; traceback.print_exc()
         return {"error": "Something happened while trying to save the session."}, 500
+
+
+# --------- Climb Locations ---------
+def fetch_climb_locations() -> List[Dict[str, Any]]:
+    """
+    Fetch climb locations.
+
+    Returns JSON-friendly list:
+    [
+      {
+        "Indonesia": {
+            "Jakarta": ["Alpine Outpost Indonesia", "Indoclimb Kemang"],
+            "Alam Sutera": ["Dreamstone Alam Sutera"]
+        }
+      }
+    ]
+    """
+    with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            select location, array_agg(gym_name order by gym_chain asc, gym_name asc) as gyms
+            from climbing_locations
+            where status = 'active'
+            group by location
+            """
+        )
+        rows = cur.fetchall()
+
+    grouped = defaultdict(dict)
+
+    for country_code, location, gyms in rows:
+        grouped[country_code][location] = list[str](gyms)
+
+    result = [{k: v} for k, v in grouped.items()]
+
+    return json.dumps(result, indent=2)

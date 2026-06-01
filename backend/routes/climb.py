@@ -30,3 +30,12 @@ def api_commit_session():
     payload = request.get_json(silent=True) or {}
     body, status = commit_session_service(uid, payload)
     return jsonify(body), status
+
+# --------- Climb locations ---------
+@climb_bp.get("/locations")
+@login_required
+def api_get_climb_locations():
+    """
+    Fetch active climb locations
+    """
+    pass
