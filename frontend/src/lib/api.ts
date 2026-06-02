@@ -1,7 +1,7 @@
 // api.ts
 import type { UserProfile } from '../types/user';
 import type { LastClimb, WeeklyClimbSummary, HistoricalClimb, GradeSystem,
-    CommitSessionPayload, CommitSessionResponse
+    CommitSessionPayload, CommitSessionResponse, ClimbLocations
  } from '../types/climb';
 import { joinURL } from "./url.ts";
 
@@ -175,6 +175,19 @@ export async function apiFetchGradeSystems(): Promise<GradeSystem[]> {
     const res = await fetch(joinURL("/api/grades"), { credentials: "include" });
     if (!res.ok) return [];
     return (await res.json()) as GradeSystem[];
+  } catch {
+    return [];
+  }
+}
+
+export async function apiFetchClimbLocations(): Promise<ClimbLocations> {
+  try {
+    const res = await fetch(joinURL("/api/climb-locations"), { credentials: "include" });
+    if (!res.ok) return [];
+    const body = await res.json();
+    // Backend may serialize the tree as a JSON string; tolerate both shapes.
+    const data = typeof body === "string" ? JSON.parse(body) : body;
+    return Array.isArray(data) ? (data as ClimbLocations) : [];
   } catch {
     return [];
   }

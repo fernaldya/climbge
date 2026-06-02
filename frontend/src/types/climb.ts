@@ -28,6 +28,17 @@ export type GradeSystem = {
   grades: string;
 }
 
+// Climb locations are returned grouped by country, then city, then gym names:
+// [ { "Indonesia": { "Jakarta": ["Alpine Outpost", "Indoclimb Kemang"] } } ]
+export type ClimbLocationTree = Record<string, Record<string, string[]>>;
+export type ClimbLocations = ClimbLocationTree[];
+
+export type SelectedLocation = {
+  country: string;
+  city: string;
+  gym: string;
+};
+
 export interface LocalRoute {
   id: string;
   gradeSystem?: number;
@@ -44,6 +55,7 @@ export interface LocalSession {
   startedAt: string;
   endedAt?: string;
   notes?: string;
+  location?: SelectedLocation;
   routes: LocalRoute[];
 }
 
@@ -52,6 +64,7 @@ export type CommitSessionPayload = {
     started_at: string;
     ended_at: string;
     notes?: string;
+    location?: string;
   };
   routes: Array<{
     grade_system: number | null;

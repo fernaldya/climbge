@@ -8,14 +8,15 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Trash2, Check, Zap } from "lucide-react";
-import { apiFetchGradeSystems, apiCommitClimbSession } from "../lib/api";
-import type { LocalSession, LocalRoute, GradeSystem } from "../types/climb";
+import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Trash2, Check, Zap, MapPin, ChevronRight } from "lucide-react";
+import { apiFetchGradeSystems, apiCommitClimbSession, apiFetchClimbLocations } from "../lib/api";
+import type { LocalSession, LocalRoute, GradeSystem, ClimbLocations, SelectedLocation } from "../types/climb";
 
 // --- Config / constants ----------------------------------------------------
 const LS_KEYS = {
   CURRENT: "climb.currentSession",
   DEFAULT_GS: "climb.defaultGradeSystem",
+  LOCATION: "climb.location",
 } as const;
 
 
@@ -58,6 +59,11 @@ export function ClimbTab() {
   const [timeGoalMin, setTimeGoalMin] = useState<number | string>(120);
   const [routeGoal, setRouteGoal] = useState<number | string>(8);
 
+  // Location
+  const [locations, setLocations] = useState<ClimbLocations>([]);
+  const [location, setLocation] = useState<SelectedLocation | null>(null);
+  const [openLoc, setOpenLoc] = useState(false);
+
   // Grade systems from DB
   const [systems, setSystems] = useState<GradeSystem[]>([]);
   const byId = useMemo(() => {
@@ -85,20 +91,34 @@ export function ClimbTab() {
   const [committing, setCommitting] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
 
-  // Mount: load session + systems
+  // Mount: load session + systems + locations
   useEffect(() => {
     const ls = loadSession();
     if (ls) {
       setSession(ls);
       setNotes(ls.notes || "");
+      if (ls.location) setLocation(ls.location);
       const started = new Date(ls.startedAt).getTime();
       const now = Date.now();
       setElapsed(Math.max(0, Math.floor((now - started) / 1000)));
       setRunning(true);
+    } else {
+      // No active session: restore the last picked location for convenience.
+      const savedLoc = localStorage.getItem(LS_KEYS.LOCATION);
+      if (savedLoc) {
+        try { setLocation(JSON.parse(savedLoc) as SelectedLocation); } catch { /* ignore */ }
+      }
     }
     (async () => {
       try {
         setSystems(await apiFetchGradeSystems());
+      } catch {
+        /* ignore */
+      }
+    })();
+    (async () => {
+      try {
+        setLocations(await apiFetchClimbLocations());
       } catch {
         /* ignore */
       }
@@ -153,10 +173,18 @@ export function ClimbTab() {
   }, [elapsed]);
 
   // --- Actions -------------------------------------------------------------
+  function pickLocation(sel: SelectedLocation) {
+    setLocation(sel);
+    localStorage.setItem(LS_KEYS.LOCATION, JSON.stringify(sel));
+    // If a session is already running, keep its captured location in sync.
+    setSession((prev) => (prev ? { ...prev, location: sel } : prev));
+    setOpenLoc(false);
+  }
+
   function startSession() {
     if (session) return; // already running
     const now = new Date().toISOString();
-    const ls: LocalSession = { sessionId: uuid(), startedAt: now, notes, routes: [] };
+    const ls: LocalSession = { sessionId: uuid(), startedAt: now, notes, location: location ?? undefined, routes: [] };
     setSession(ls);
     saveSession(ls);
     setRunning(true);
@@ -240,7 +268,12 @@ export function ClimbTab() {
     setCommitError(null);
     try {
       const payload = {
-        session: { started_at: session.startedAt, ended_at: new Date().toISOString(), notes },
+        session: {
+          started_at: session.startedAt,
+          ended_at: new Date().toISOString(),
+          notes,
+          location: (session.location ?? location)?.gym,
+        },
         routes: session.routes.map((r) => ({
           grade_system: r.gradeSystem ?? 999,
           grade_system_label: r.gradeSystem === 999 ? r.gradeSystemLabel : undefined,
@@ -282,9 +315,33 @@ export function ClimbTab() {
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
+          {/* Location picker — visible before and during a session */}
+          <button
+            type="button"
+            onClick={() => setOpenLoc(true)}
+            className="mt-2 w-full flex items-center gap-3 rounded-2xl border p-4 text-left ring-1 ring-orange-200/60 bg-white hover:bg-orange-50 active:scale-[0.99] transition-all"
+            aria-label="Choose location"
+          >
+            <div className="h-10 w-10 shrink-0 rounded-full grid place-items-center ring-2 ring-orange-300/60 bg-orange-500/10">
+              <MapPin className="h-5 w-5 text-orange-600" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs text-muted-foreground">Location</div>
+              <div className="font-semibold truncate">
+                {location ? location.gym : "Select a gym"}
+              </div>
+              {location && (
+                <div className="text-xs text-muted-foreground truncate">
+                  {location.city}, {location.country}
+                </div>
+              )}
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+          </button>
+
           {!session ? (
-            // Idle → Big full-width Start button
-            <div className="mt-2">
+            // Idle → big full-width Start button
+            <div className="mt-3">
               <Button
                 onClick={startSession}
                 className="w-full select-none rounded-2xl p-6 gap-4 ring-1 ring-orange-200/60 bg-gradient-to-b from-orange-50 to-white hover:from-orange-100 active:scale-[0.99] transition-all"
@@ -473,6 +530,82 @@ export function ClimbTab() {
           </CardContent>
         </Card>
       )}
+
+      {/* Location picker dialog */}
+      <Dialog open={openLoc} onOpenChange={setOpenLoc}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select location</DialogTitle>
+            <DialogDescription>Choose the gym where you're climbing.</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 rounded-xl border">
+            <ScrollArea className="max-h-80">
+              {locations.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">
+                  No locations available.
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {locations.flatMap((countryObj) =>
+                    Object.entries(countryObj).map(([country, cities]) => (
+                      <div key={country} className="p-2">
+                        <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {country}
+                        </div>
+                        {Object.entries(cities).map(([city, gyms]) => (
+                          <div key={city} className="mt-1">
+                            <div className="px-2 py-1 text-sm font-medium">{city}</div>
+                            <div className="space-y-1">
+                              {gyms.map((gym) => {
+                                const selected =
+                                  location?.gym === gym &&
+                                  location?.city === city &&
+                                  location?.country === country;
+                                return (
+                                  <button
+                                    key={gym}
+                                    type="button"
+                                    onClick={() => pickLocation({ country, city, gym })}
+                                    className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                                      selected
+                                        ? "bg-orange-100 text-orange-700"
+                                        : "hover:bg-muted"
+                                    }`}
+                                  >
+                                    <span className="truncate">{gym}</span>
+                                    {selected && <Check className="h-4 w-4 shrink-0" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            {location && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setLocation(null);
+                  localStorage.removeItem(LS_KEYS.LOCATION);
+                  setOpenLoc(false);
+                }}
+              >
+                Clear
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setOpenLoc(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Route dialog */}
       <Dialog open={openAdd} onOpenChange={setOpenAdd}>
