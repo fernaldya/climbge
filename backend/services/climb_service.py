@@ -224,4 +224,4 @@ def fetch_climb_locations() -> List[Dict[str, Any]]:
 
     result = [{k: v} for k, v in grouped.items()]
 
-    return json.dumps(result, indent=2)
+    return result

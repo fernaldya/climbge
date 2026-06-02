@@ -28,7 +28,7 @@ def submit_feedback(user_id: str, text: str):
 def submit_new_climb_location(user_id: str, payload: dict):
     """Inserts new climbing location to the pending list"""
     if not payload:
-        return {"error": "No payload"}, 400
+        return err("invalid_request", "No payload", 400)
 
     new_location = payload.get('newLocation')
     if not isinstance(new_location, dict):

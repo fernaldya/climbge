@@ -39,4 +39,4 @@ def api_get_climb_locations():
     Fetch active climb locations
     """
     items = fetch_climb_locations()
-    return items, 200
+    return jsonify(items), 200

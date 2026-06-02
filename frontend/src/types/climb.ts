@@ -88,6 +88,7 @@ export function toCommitPayload(ls: LocalSession): CommitSessionPayload {
       started_at: ls.startedAt,
       ended_at: ls.endedAt ?? new Date().toISOString(),
       notes: ls.notes,
+      location: ls.location?.gym,
     },
     routes: ls.routes.map(r => {
       const grade_system =
