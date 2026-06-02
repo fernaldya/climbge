@@ -30,14 +30,17 @@ def submit_new_climb_location(user_id: str, payload: dict):
     if not payload:
         return {"error": "No payload"}, 400
 
-    new_location = payload.get('newLocation', {})
+    new_location = payload.get('newLocation')
+    if not isinstance(new_location, dict):
+        return err("invalid_request", "Invalid new location", 400)
+
     gym_name = new_location.get('gymName')
     gym_chain = new_location.get('gymChain')
     gym_location = new_location.get('gymLocation')
     country_code = new_location.get('countryCode')
 
     if not gym_name or not gym_location:
-        return {'error': 'Gym name and location not provided'}, 400
+        return err("invalid_request", "Gym name and location not provided", 400)
 
     try:
         with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
