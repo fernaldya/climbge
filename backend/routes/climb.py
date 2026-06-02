@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request, session
 from utils.auth import login_required
 from utils.security import current_user_id
-from services.climb_service import fetch_grades, commit_session_service
+from services.climb_service import fetch_grades, commit_session_service, fetch_climb_locations
 
 climb_bp = Blueprint("climb", __name__)
 
@@ -32,10 +32,11 @@ def api_commit_session():
     return jsonify(body), status
 
 # --------- Climb locations ---------
-@climb_bp.get("/locations")
+@climb_bp.get("/climb-locations")
 @login_required
 def api_get_climb_locations():
     """
     Fetch active climb locations
     """
-    pass
+    items = fetch_climb_locations()
+    return items, 200
