@@ -2,6 +2,8 @@ from typing import Any, Dict, List, Optional
 from psycopg.rows import dict_row
 from utils.connect_db import pool
 from utils.parse_timestamp import parse_ts
+from collections import defaultdict
+import json
 
 
 # ---------- Grade Systems ----------
@@ -50,6 +52,7 @@ def insert_session(
     started_at: str,
     ended_at: str,
     notes: Optional[str],
+    location: Optional[str]
 ) -> str:
     """
     Insert a climb_sessions row and return session_id (uuid as string).
@@ -63,11 +66,11 @@ def insert_session(
 
     cur.execute(
         """
-        INSERT INTO climb_sessions (user_id, started_at, ended_at, notes)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO climb_sessions (user_id, started_at, ended_at, notes, location)
+        VALUES (%s, %s, %s, %s, %s)
         RETURNING session_id
         """,
-        (user_id, started_dt, ended_dt, notes),
+        (user_id, started_dt, ended_dt, notes, location),
     )
     row = cur.fetchone()
     return str(row["session_id"])
@@ -160,6 +163,7 @@ def commit_session_service(user_id: str, payload: dict):
     started_at = sess.get("started_at")
     ended_at = sess.get("ended_at")
     sess_notes = sess.get("notes")
+    sess_location = sess.get("location")
 
     if not started_at or not ended_at:
         return {"error": "Missing session start or end time"}, 400
@@ -173,6 +177,7 @@ def commit_session_service(user_id: str, payload: dict):
                     started_at=started_at,
                     ended_at=ended_at,
                     notes=sess_notes,
+                    location=sess_location,
                 )
                 insert_session_routes(cur, session_id=session_id, routes=routes)
 
@@ -184,3 +189,39 @@ def commit_session_service(user_id: str, payload: dict):
     except Exception as e:
         import traceback; traceback.print_exc()
         return {"error": "Something happened while trying to save the session."}, 500
+
+
+# --------- Climb Locations ---------
+def fetch_climb_locations() -> List[Dict[str, Any]]:
+    """
+    Fetch climb locations.
+
+    Returns JSON-friendly list:
+    [
+      {
+        "Indonesia": {
+            "Jakarta": ["Alpine Outpost Indonesia", "Indoclimb Kemang"],
+            "Alam Sutera": ["Dreamstone Alam Sutera"]
+        }
+      }
+    ]
+    """
+    with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(
+            """
+            select country, location, array_agg(gym_name order by gym_chain asc, gym_name asc) as gyms
+            from climbing_locations
+            where status = 'active'
+            group by country, location
+            """
+        )
+        rows = cur.fetchall()
+
+    grouped = defaultdict(dict)
+
+    for row in rows:
+        grouped[row["country"]][row["location"]] = list(row["gyms"])
+
+    result = [{k: v} for k, v in grouped.items()]
+
+    return result
