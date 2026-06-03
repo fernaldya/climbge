@@ -230,17 +230,18 @@ export async function apiSubmitNewLocation(payload: {
   gymLocation: string;
   country: string;
 }) {
-  const res = await fetch(joinURL('/api/climb-location'), {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ newLocation: payload }),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.error?.message || 'Failed to submit location');
+  try {
+    const res = await fetch(joinURL('/api/climb-location'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newLocation: payload }),
+    });
+    return await json<{ ok: boolean }>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
   }
-  return res.json();
 }
 
 export async function apiCommitClimbSession(
