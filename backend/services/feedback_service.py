@@ -1,6 +1,8 @@
 from psycopg.rows import dict_row
+from psycopg.errors import UniqueViolation
 from utils.http import err
 from utils.connect_db import pool
+from string import capwords
 
 def submit_feedback(user_id: str, text: str):
     """Inserts user feedback"""
@@ -37,18 +39,21 @@ def submit_new_climb_location(user_id: str, payload: dict):
     gym_name = new_location.get('gymName')
     gym_chain = new_location.get('gymChain')
     gym_location = new_location.get('gymLocation')
-    country_code = new_location.get('countryCode')
+    country = new_location.get('country')
 
-    if not gym_name or not gym_location:
-        return err("invalid_request", "Gym name and location not provided", 400)
+    if not gym_name or not gym_location or not country:
+        return err("invalid_request", "Gym name, location, and country are required", 400)
 
     try:
         with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                "INSERT INTO climbing_locations (gym_name, gym_chain, location, country_code, submitted_by) VALUES (%s, %s, %s, %s, %s)",
-                (gym_name, gym_chain, gym_location, country_code, user_id),
+                "INSERT INTO climbing_locations (gym_name, gym_chain, location, country, submitted_by) VALUES (%s, %s, %s, %s, %s)",
+                (capwords(gym_name), capwords(gym_chain) if gym_chain else None, gym_location.upper(), country.upper(), user_id),
             )
 
         return {"ok": True}, 200
+        
+    except UniqueViolation:
+        return err("already_exists", "This gym location has already been submitted.", 409)
     except Exception:
         return err("db_error", "Database error.", 500)

@@ -11,7 +11,7 @@ def feedback():
     uid = current_user_id()
     body = request.get_json(silent=True) or {}
     payload, status = submit_feedback(uid, (body.get("feedback") or "").strip())
-    return jsonify(payload), status
+    return payload, status
 
 @feedback_bp.post("/climb-location")
 @login_required
@@ -19,4 +19,4 @@ def add_climb_location():
     uid = current_user_id()
     body = request.get_json(silent=True) or {}
     payload, status = submit_new_climb_location(uid, body)
-    return jsonify(payload), status
+    return payload, status
