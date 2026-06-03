@@ -224,6 +224,26 @@ export async function apiResetPassword(token: string, newPassword: string) {
   }
 }
 
+export async function apiSubmitNewLocation(payload: {
+  gymName: string;
+  gymChain?: string;
+  gymLocation: string;
+  country: string;
+}) {
+  try {
+    const res = await fetch(joinURL('/api/climb-location'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newLocation: payload }),
+    });
+    return await json<{ ok: boolean }>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
+  }
+}
+
 export async function apiCommitClimbSession(
   payload: CommitSessionPayload
 ): Promise<CommitSessionResponse> {
