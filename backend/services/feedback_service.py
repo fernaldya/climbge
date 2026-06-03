@@ -41,6 +41,11 @@ def submit_new_climb_location(user_id: str, payload: dict):
     gym_location = new_location.get('gymLocation')
     country = new_location.get('country')
 
+    gym_name = str(gym_name) if gym_name is not None else None
+    gym_chain = str(gym_chain) if gym_chain is not None else None
+    gym_location = str(gym_location) if gym_location is not None else None
+    country = str(country) if country is not None else None
+
     if not gym_name or not gym_location or not country:
         return err("invalid_request", "Gym name, location, and country are required", 400)
 
