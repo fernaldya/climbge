@@ -53,7 +53,7 @@ def submit_new_climb_location(user_id: str, payload: dict):
         with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 "INSERT INTO climbing_locations (gym_name, gym_chain, location, country, submitted_by) VALUES (%s, %s, %s, %s, %s)",
-                (capwords(gym_name), capwords(gym_chain) if gym_chain else None, gym_location.upper(), country.upper(), user_id),
+                (capwords(gym_name), capwords(gym_chain) if gym_chain else None, gym_location.upper(), capwords(country), user_id),
             )
 
         return {"ok": True}, 200
