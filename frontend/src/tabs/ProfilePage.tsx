@@ -9,8 +9,9 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 
-import { Calendar, MapPin, MessageSquareShare, LogOut, Pencil } from 'lucide-react';
+import { Calendar, MapPin, MessageSquareShare, LogOut, Pencil, MapPinPlus } from 'lucide-react';
 import { FeedbackDialog } from '../components/Feedback';
+import { NewLocationDialog } from '../components/NewLocationDialog';
 import { apiFeedback, apiSaveMeasurementsMetric } from '../lib/api';
 
 interface ProfileTabProps {
@@ -58,6 +59,9 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
     const diffYears = (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
     return diffYears < 1 ? '<1' : Math.floor(diffYears).toString();
   };
+
+  // ---------- New Location ----------
+  const [newLocationDialogOpen, setNewLocationDialogOpen] = useState(false);
 
   // ---------- Feedback ----------
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
@@ -182,6 +186,10 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
 
       {/* Settings & Actions (sticky) */}
       <div className="px-2 space-y-3 sticky bottom-20 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <Button variant="outline" className="w-full justify-start gap-3 h-12 text-left" onClick={() => setNewLocationDialogOpen(true)}>
+          <MapPinPlus className="h-5 w-5" />
+          Add a new gym location
+        </Button>
         <Button variant="outline" className="w-full justify-start gap-3 h-12 text-left" onClick={() => setFeedbackDialogOpen(true)}>
           <MessageSquareShare className="h-5 w-5" />
           Let us know how you feel about Climbge
@@ -192,6 +200,7 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
         </Button>
       </div>
 
+      <NewLocationDialog open={newLocationDialogOpen} onOpenChange={setNewLocationDialogOpen} />
       <FeedbackDialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen} onSubmit={submitFeedback} />
 
       {/* Metric-only edit dialog */}
