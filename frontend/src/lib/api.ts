@@ -244,6 +244,25 @@ export async function apiSubmitNewLocation(payload: {
   }
 }
 
+export async function apiSubmitNewGradeSystem(payload: {
+  gradeSystemName: string;
+  climbType: string;
+  grades: string[];
+}) {
+  try {
+    const res = await fetch(joinURL('/api/grade-system'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newGradeSystem: payload }),
+    });
+    return await json<{ ok: boolean }>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
+  }
+}
+
 export async function apiCommitClimbSession(
   payload: CommitSessionPayload
 ): Promise<CommitSessionResponse> {
