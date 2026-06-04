@@ -41,10 +41,11 @@ def submit_new_climb_location(user_id: str, payload: dict):
     gym_location = new_location.get('gymLocation')
     country = new_location.get('country')
 
-    gym_name = str(gym_name).strip() if gym_name is not None else None
-    gym_chain = str(gym_chain).strip() if gym_chain is not None else None
-    gym_location = str(gym_location).strip() if gym_location is not None else None
-    country = str(country).strip() if country is not None else None
+    # Reject non-string inputs rather than coercing objects/lists into the DB.
+    gym_name = gym_name.strip() if isinstance(gym_name, str) else None
+    gym_chain = gym_chain.strip() if isinstance(gym_chain, str) else None
+    gym_location = gym_location.strip() if isinstance(gym_location, str) else None
+    country = country.strip() if isinstance(country, str) else None
 
     if not gym_name or not gym_location or not country:
         return err("invalid_request", "Gym name, location, and country are required", 400)
@@ -77,14 +78,13 @@ def submit_new_grade_system(user_id: str, payload: dict):
     grades = grade_system.get('grades')
     climb_type = grade_system.get('climbType')
 
-    grade_name = capwords(str(grade_name).strip()) if grade_name is not None else None
-    climb_type = capwords(str(climb_type).strip()) if climb_type is not None else None
-    # if climb_type not in ('boulder', 'rope'):
-    #     return err("invalid_request", "Climb type must be 'boulder' or 'rope'", 400)
+    # Reject non-string inputs rather than coercing objects/lists into the DB.
+    grade_name = capwords(grade_name.strip()) if isinstance(grade_name, str) else None
+    climb_type = capwords(climb_type.strip()) if isinstance(climb_type, str) else None
 
     # FE sends grades as a JSON array; still sanitize since the endpoint is public.
     if isinstance(grades, list):
-        cleaned = [str(g).strip() for g in grades if str(g).strip()]
+        cleaned = [g.strip() for g in grades if isinstance(g, str) and g.strip()]
     elif isinstance(grades, str):
         cleaned = [g.strip() for g in grades.split(',') if g.strip()]
     else:
@@ -93,8 +93,8 @@ def submit_new_grade_system(user_id: str, payload: dict):
     # Drop duplicates while preserving order (first occurrence wins).
     grade_list = list(dict.fromkeys(cleaned))
 
-    if not grade_name or not grade_list:
-        return err("invalid_request", "Grade system name and grades are required", 400)
+    if not grade_name or not climb_type or not grade_list:
+        return err("invalid_request", "Grade system name, climb type, and grades are required", 400)
 
     try:
         with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
