@@ -9,9 +9,10 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 
-import { Calendar, MapPin, MessageSquareShare, LogOut, Pencil, MapPinPlus } from 'lucide-react';
+import { Calendar, MapPin, MessageSquareShare, LogOut, Pencil, MapPinPlus, ListPlus } from 'lucide-react';
 import { FeedbackDialog } from '../components/Feedback';
 import { NewLocationDialog } from '../components/NewLocationDialog';
+import { NewGradeSystemDialog } from '../components/NewGradeSystemDialog';
 import { apiFeedback, apiSaveMeasurementsMetric } from '../lib/api';
 
 interface ProfileTabProps {
@@ -62,6 +63,7 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
 
   // ---------- New Location ----------
   const [newLocationDialogOpen, setNewLocationDialogOpen] = useState(false);
+  const [newGradeSystemDialogOpen, setNewGradeSystemDialogOpen] = useState(false);
 
   // ---------- Feedback ----------
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
@@ -186,6 +188,10 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
 
       {/* Settings & Actions (sticky) */}
       <div className="px-2 space-y-3 sticky bottom-20 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <Button variant="outline" className="w-full justify-start gap-3 h-12 text-left" onClick={() => setNewGradeSystemDialogOpen(true)}>
+          <ListPlus className="h-5 w-5" />
+          Add a new grade system
+        </Button>
         <Button variant="outline" className="w-full justify-start gap-3 h-12 text-left" onClick={() => setNewLocationDialogOpen(true)}>
           <MapPinPlus className="h-5 w-5" />
           Add a new gym location
@@ -201,6 +207,7 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
       </div>
 
       <NewLocationDialog open={newLocationDialogOpen} onOpenChange={setNewLocationDialogOpen} />
+      <NewGradeSystemDialog open={newGradeSystemDialogOpen} onOpenChange={setNewGradeSystemDialogOpen} />
       <FeedbackDialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen} onSubmit={submitFeedback} />
 
       {/* Metric-only edit dialog */}

@@ -29,3 +29,69 @@ jobs:
           script: |
             export REPO_SSH_URL=${{ secrets.REPO_SSH_URL }}
             bash -lc '/app/deploy.sh'
+
+  notify:
+    needs: deploy
+    if: always()
+    runs-on: ubuntu-latest
+    environment: secrets
+    steps:
+      - name: Notify Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_USER_ID: ${{ secrets.DISCORD_USER_ID }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL not set; skipping Discord notification."
+            exit 0
+          fi
+
+          case "$DEPLOY_RESULT" in
+            success) STATUS="✅ Succeeded"; COLOR=3066993 ;;
+            failure) STATUS="❌ Failed";    COLOR=15158332 ;;
+            *)       STATUS="⚠️ ${DEPLOY_RESULT}"; COLOR=15844367 ;;
+          esac
+
+          SHORT_SHA=$(printf '%s' "$SHA" | cut -c1-7)
+          COMMIT_LINE=$(printf '%s' "$COMMIT_MSG" | head -n1)
+
+          # @-mention only on failure (needs DISCORD_USER_ID secret to actually ping).
+          CONTENT=""
+          if [ "$DEPLOY_RESULT" = "failure" ] && [ -n "$DISCORD_USER_ID" ]; then
+            CONTENT="<@${DISCORD_USER_ID}> deploy failed"
+          fi
+
+          # Build the payload with jq so commit messages are safely escaped.
+          payload=$(jq -n \
+            --arg content "$CONTENT" \
+            --arg title "Deploy Backend — ${STATUS}" \
+            --arg url "$RUN_URL" \
+            --argjson color "$COLOR" \
+            --arg repo "$REPO" \
+            --arg branch "$BRANCH" \
+            --arg commit "${SHORT_SHA}${COMMIT_LINE:+ — $COMMIT_LINE}" \
+            --arg actor "$ACTOR" \
+            '{
+              content: $content,
+              allowed_mentions: { parse: ["users"] },
+              embeds: [{
+                title: $title,
+                url: $url,
+                color: $color,
+                fields: [
+                  { name: "Repository", value: $repo, inline: true },
+                  { name: "Branch", value: $branch, inline: true },
+                  { name: "Commit", value: ($commit[0:1024]), inline: false },
+                  { name: "Triggered by", value: $actor, inline: true }
+                ]
+              }]
+            }')
+
+          curl -fsS -H "Content-Type: application/json" -X POST -d "$payload" "$DISCORD_WEBHOOK_URL"
