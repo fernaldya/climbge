@@ -61,9 +61,18 @@ export function NewGradeSystemDialog({
 
   useEffect(() => () => { if (resetTimer) window.clearTimeout(resetTimer); }, [resetTimer]);
 
+  // Cancel any pending reset when the dialog is (re)opened so it can't wipe input.
+  useEffect(() => {
+    if (open && resetTimer) {
+      window.clearTimeout(resetTimer);
+      setResetTimer(null);
+    }
+  }, [open, resetTimer]);
+
   function handleClose() {
     if (submitting) return;
     onOpenChange(false);
+    if (resetTimer) window.clearTimeout(resetTimer);
     const t = window.setTimeout(() => resetState(), 200);
     setResetTimer(t);
   }
