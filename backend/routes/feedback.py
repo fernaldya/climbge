@@ -1,6 +1,9 @@
 from flask import Blueprint, request, jsonify, session
-from utils.auth import login_required
-from services.feedback_service import submit_feedback, submit_new_climb_location, submit_new_grade_system
+from utils.auth import login_required, approver_required
+from services.feedback_service import (
+    submit_feedback, submit_new_climb_location, submit_new_grade_system,
+    get_approval_queue as fetch_approval_queue, submit_approval_decision,
+)
 from utils.security import current_user_id
 
 feedback_bp = Blueprint("feedback", __name__)
@@ -29,4 +32,20 @@ def add_grade_system():
     uid = current_user_id()
     body = request.get_json(silent=True) or {}
     payload, status = submit_new_grade_system(uid, body)
+    return payload, status
+
+
+@feedback_bp.get("/approval-queue")
+@approver_required
+def approval_queue():
+    payload, status = fetch_approval_queue()
+    return payload, status
+
+
+@feedback_bp.post("/approval-decision")
+@approver_required
+def approval_decision():
+    uid = current_user_id()
+    body = request.get_json(silent=True) or {}
+    payload, status = submit_approval_decision(uid, body)
     return payload, status

@@ -19,7 +19,8 @@ def fetch_user_profile(user_id):
               weight,
               ape_index,
               grip_strength,
-              unit_of_measurement
+              unit_of_measurement,
+              role
             FROM public.user_profile
             WHERE user_id = %s
             LIMIT 1
@@ -49,6 +50,7 @@ def fetch_user_profile(user_id):
     return {
         'user_id': str(row['user_id']),
         'username': row['username'],
+        'role': row.get('role'),
         'demography': {
             'startedClimbing': row['started_climbing'],
             'age': row.get('age') or '-',
