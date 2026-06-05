@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { ChevronDown, ChevronRight, Check, X } from "lucide-react";
@@ -22,6 +22,8 @@ export function ReviewSubmissionsDialog({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Synchronous lock so rapid clicks can't start overlapping requests.
+  const busyRef = useRef<string | null>(null);
 
   const grades = queue?.grade_queue ?? [];
   const locations = queue?.climb_queue ?? [];
@@ -33,7 +35,9 @@ export function ReviewSubmissionsDialog({
   }
 
   async function decide(itemType: ItemType, itemId: number, action: "approve" | "reject") {
+    if (busyRef.current) return; // a request is already in flight
     const key = `${itemType}:${itemId}`;
+    busyRef.current = key;
     setBusyKey(key);
     setError(null);
     try {
@@ -48,7 +52,10 @@ export function ReviewSubmissionsDialog({
     } catch (e: any) {
       setError(e?.message || "Failed to apply decision.");
     } finally {
-      setBusyKey(null);
+      if (busyRef.current === key) {
+        busyRef.current = null;
+        setBusyKey(null);
+      }
     }
   }
 

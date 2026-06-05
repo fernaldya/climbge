@@ -35,7 +35,8 @@ async function parseJsonSafe(res: Response) {
 function mapResponseToError(res: Response, payload: any): ApiError {
   // Use status to decide the friendly message
   if (res.status === 401) {
-    return new ApiError('INVALID_CREDENTIALS', 'Invalid username or password.', res.status);
+    const msg = payload?.error?.message || 'Your session has expired. Please log in again.';
+    return new ApiError('UNAUTHORIZED', msg, res.status);
   }
   if (res.status === 403) {
     const msg = payload?.error?.message || "You don't have permission to do this.";
