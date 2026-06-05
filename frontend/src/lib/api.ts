@@ -1,13 +1,15 @@
 // api.ts
 import type { UserProfile } from '../types/user';
 import type { LastClimb, WeeklyClimbSummary, HistoricalClimb, GradeSystem,
-    CommitSessionPayload, CommitSessionResponse, ClimbLocations
+    CommitSessionPayload, CommitSessionResponse, ClimbLocations,
+    ApprovalQueue, ApprovalDecision
  } from '../types/climb';
 import { joinURL } from "./url.ts";
 
 type ApiErrorCode =
   | 'INVALID_CREDENTIALS'
   | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
   | 'NOT_FOUND'
   | 'SERVER_ERROR'
   | 'NETWORK_ERROR'
@@ -32,8 +34,12 @@ async function parseJsonSafe(res: Response) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapResponseToError(res: Response, payload: any): ApiError {
   // Use status to decide the friendly message
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 401) {
     return new ApiError('INVALID_CREDENTIALS', 'Invalid username or password.', res.status);
+  }
+  if (res.status === 403) {
+    const msg = payload?.error?.message || "You don't have permission to do this.";
+    return new ApiError('FORBIDDEN', msg, res.status);
   }
   if (res.status >= 500) {
     return new ApiError('SERVER_ERROR', 'Server error. Please try again in a moment.', res.status);
@@ -257,6 +263,34 @@ export async function apiSubmitNewGradeSystem(payload: {
       body: JSON.stringify({ newGradeSystem: payload }),
     });
     return await json<{ ok: boolean }>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
+  }
+}
+
+export async function apiFetchApprovalQueue(): Promise<ApprovalQueue> {
+  try {
+    const res = await fetch(joinURL('/api/approval-queue'), { credentials: 'include' });
+    return await json<ApprovalQueue>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
+  }
+}
+
+export async function apiSubmitApprovalDecision(decisions: ApprovalDecision[]) {
+  try {
+    const res = await fetch(joinURL('/api/approval-decision'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decisions }),
+    });
+    return await json<{
+      ok: boolean;
+      results: Array<{ itemType: string | null; itemId: number | null; ok: boolean; action?: string; error?: string }>;
+    }>(res);
   } catch (e) {
     if (e instanceof ApiError) throw e;
     mapNetworkError(e);
