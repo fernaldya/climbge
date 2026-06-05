@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request
 from utils.auth import login_required, approver_required
 from services.feedback_service import (
     submit_feedback, submit_new_climb_location, submit_new_grade_system,

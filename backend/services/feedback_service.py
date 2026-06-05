@@ -167,6 +167,7 @@ def submit_approval_decision(user_id: str, payload: dict):
         return err("invalid_request", "Invalid decisions", 400)
 
     results = []
+    seen_pairs = set()
     for decision in decisions:
         if not isinstance(decision, dict):
             results.append({"itemType": None, "itemId": None, "ok": False, "error": "Invalid decision"})
@@ -187,6 +188,13 @@ def submit_approval_decision(user_id: str, payload: dict):
         if not isinstance(item_id, int) or isinstance(item_id, bool):
             results.append({"itemType": item_type, "itemId": item_id, "ok": False, "error": "Invalid item id"})
             continue
+
+        # Reject conflicting / repeated decisions for the same item in one batch.
+        pair = (item_type, item_id)
+        if pair in seen_pairs:
+            results.append({"itemType": item_type, "itemId": item_id, "ok": False, "error": "Duplicate decision"})
+            continue
+        seen_pairs.add(pair)
 
         is_approved = action == 'approve'
         proc = _APPROVAL_PROCS[item_type]
