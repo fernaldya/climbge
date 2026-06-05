@@ -16,7 +16,7 @@ def feedback():
     payload, status = submit_feedback(uid, (body.get("feedback") or "").strip())
     return payload, status
 
-
+    
 @feedback_bp.post("/climb-location")
 @login_required
 def add_climb_location():
