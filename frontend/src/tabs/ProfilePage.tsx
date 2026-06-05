@@ -9,11 +9,13 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 
-import { Calendar, MapPin, MessageSquareShare, LogOut, Pencil, MapPinPlus, ListPlus } from 'lucide-react';
+import { Calendar, MapPin, MessageSquareShare, LogOut, Pencil, MapPinPlus, ListPlus, ClipboardCheck, Bookmark } from 'lucide-react';
 import { FeedbackDialog } from '../components/Feedback';
 import { NewLocationDialog } from '../components/NewLocationDialog';
 import { NewGradeSystemDialog } from '../components/NewGradeSystemDialog';
-import { apiFeedback, apiSaveMeasurementsMetric } from '../lib/api';
+import { ReviewSubmissionsDialog } from '../components/ReviewSubmissionsDialog';
+import { apiFeedback, apiSaveMeasurementsMetric, apiFetchApprovalQueue } from '../lib/api';
+import type { ApprovalQueue } from '../types/climb';
 
 interface ProfileTabProps {
   userProfile: UserProfile;
@@ -64,6 +66,24 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
   // ---------- New Location ----------
   const [newLocationDialogOpen, setNewLocationDialogOpen] = useState(false);
   const [newGradeSystemDialogOpen, setNewGradeSystemDialogOpen] = useState(false);
+
+  // ---------- Approver review ----------
+  const isApprover = userProfile?.role === 'admin' || userProfile?.role === 'approver';
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [approvalQueue, setApprovalQueue] = useState<ApprovalQueue | null>(null);
+  const pendingCount = (approvalQueue?.grade_queue.length ?? 0) + (approvalQueue?.climb_queue.length ?? 0);
+
+  async function refreshApprovalQueue() {
+    try {
+      setApprovalQueue(await apiFetchApprovalQueue());
+    } catch {
+      // Non-fatal: the button still works, just without a count.
+    }
+  }
+
+  useEffect(() => {
+    if (isApprover) refreshApprovalQueue();
+  }, [isApprover]);
 
   // ---------- Feedback ----------
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
@@ -188,6 +208,17 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
 
       {/* Settings & Actions (sticky) */}
       <div className="px-2 space-y-3 sticky bottom-20 z-10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        {isApprover && (
+          <div className="relative">
+            <Button variant="outline" className="w-full justify-start gap-3 h-12 text-left" onClick={() => setReviewDialogOpen(true)}>
+              <ClipboardCheck className="h-5 w-5" />
+              Review submissions
+            </Button>
+            {pendingCount > 0 && (
+              <Bookmark className="absolute -top-0.5 right-3 h-5.5 w-5.5 fill-red-500 text-red-500" />
+            )}
+          </div>
+        )}
         <Button variant="outline" className="w-full justify-start gap-3 h-12 text-left" onClick={() => setNewGradeSystemDialogOpen(true)}>
           <ListPlus className="h-5 w-5" />
           Add a new grade system
@@ -208,6 +239,14 @@ export function ProfileTab({ userProfile, onLogout }: ProfileTabProps) {
 
       <NewLocationDialog open={newLocationDialogOpen} onOpenChange={setNewLocationDialogOpen} />
       <NewGradeSystemDialog open={newGradeSystemDialogOpen} onOpenChange={setNewGradeSystemDialogOpen} />
+      {isApprover && (
+        <ReviewSubmissionsDialog
+          open={reviewDialogOpen}
+          onOpenChange={setReviewDialogOpen}
+          queue={approvalQueue}
+          onRefresh={refreshApprovalQueue}
+        />
+      )}
       <FeedbackDialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen} onSubmit={submitFeedback} />
 
       {/* Metric-only edit dialog */}

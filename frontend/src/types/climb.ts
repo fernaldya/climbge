@@ -28,6 +28,33 @@ export type GradeSystem = {
   grades: string;
 }
 
+// Approval queue items mirror the backend view columns (snake_case).
+export type PendingGradeSystem = {
+  grade_id: number;
+  grade_system: string;
+  grades: string[];
+  climb_type: string;
+};
+
+export type PendingGymLocation = {
+  id: number;
+  gym_name: string;
+  gym_chain: string | null;
+  location: string;
+  country: string;
+};
+
+export type ApprovalQueue = {
+  grade_queue: PendingGradeSystem[];
+  climb_queue: PendingGymLocation[];
+};
+
+export type ApprovalDecision = {
+  itemType: 'grade' | 'location';
+  itemId: number;
+  action: 'approve' | 'reject';
+};
+
 // Climb locations are returned grouped by country, then city, then gym names:
 // [ { "Indonesia": { "Jakarta": ["Alpine Outpost", "Indoclimb Kemang"] } } ]
 export type ClimbLocationTree = Record<string, Record<string, string[]>>;

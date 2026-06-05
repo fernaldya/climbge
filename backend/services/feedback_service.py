@@ -109,3 +109,100 @@ def submit_new_grade_system(user_id: str, payload: dict):
         return err("already_exists", "This grade system has already been submitted.", 409)
     except Exception:
         return err("db_error", "Database error.", 500)
+
+
+def get_approval_queue():
+    """Fetch the approval queue for pending / rejected grade systems and climb locations"""
+    try:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT grade_id, grade_system, grades, climb_type
+                FROM vw_pending_rejected_grade_system
+                """
+            )
+            grade_queue = cur.fetchall()
+            
+            cur.execute(
+                """
+                SELECT id, gym_name, gym_chain, location, country
+                FROM vw_pending_rejected_gym
+                """
+            )
+            climb_queue = cur.fetchall()
+            return {"grade_queue": grade_queue, "climb_queue": climb_queue}, 200
+    except Exception:
+        return err("db_error", "Database error.", 500)
+
+
+_APPROVAL_PROCS = {
+    'grade': 'sp_approve_grade_system',
+    'location': 'sp_approve_climb_location',
+}
+
+
+def submit_approval_decision(user_id: str, payload: dict):
+    """
+    Make a decision on pending / rejected grade systems or climb locations.
+
+    Expects payload:
+    {
+        "decisions": [
+            {
+                "itemType": "grade" | "location",
+                "itemId": int,
+                "action": "approve" | "reject"
+            }
+        ]
+    }
+
+    Each decision commits in its own transaction; a failing item does not roll
+    back the others. Returns a per-item result summary.
+    """
+    if not isinstance(payload, dict) or not payload:
+        return err("invalid_request", "No payload", 400)
+
+    decisions = payload.get('decisions')
+    if not isinstance(decisions, list) or not decisions:
+        return err("invalid_request", "Invalid decisions", 400)
+
+    results = []
+    seen_pairs = set()
+    for decision in decisions:
+        if not isinstance(decision, dict):
+            results.append({"itemType": None, "itemId": None, "ok": False, "error": "Invalid decision"})
+            continue
+
+        item_type = decision.get('itemType')
+        item_id = decision.get('itemId')
+        action = decision.get('action')
+
+        if item_type not in _APPROVAL_PROCS:
+            results.append({"itemType": item_type, "itemId": item_id, "ok": False, "error": "Invalid item type"})
+            continue
+
+        if action not in ('approve', 'reject'):
+            results.append({"itemType": item_type, "itemId": item_id, "ok": False, "error": "Invalid action"})
+            continue
+
+        if not isinstance(item_id, int) or isinstance(item_id, bool):
+            results.append({"itemType": item_type, "itemId": item_id, "ok": False, "error": "Invalid item id"})
+            continue
+
+        # Reject conflicting / repeated decisions for the same item in one batch.
+        pair = (item_type, item_id)
+        if pair in seen_pairs:
+            results.append({"itemType": item_type, "itemId": item_id, "ok": False, "error": "Duplicate decision"})
+            continue
+        seen_pairs.add(pair)
+
+        is_approved = action == 'approve'
+        proc = _APPROVAL_PROCS[item_type]
+        try:
+            with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(f"CALL {proc}(%s, %s, %s, %s)", (item_id, user_id, is_approved, None))
+            results.append({"itemType": item_type, "itemId": item_id, "ok": True, "action": action})
+        except Exception:
+            results.append({"itemType": item_type, "itemId": item_id, "ok": False, "error": "Database error"})
+
+    return {"ok": all(r["ok"] for r in results), "results": results}, 200

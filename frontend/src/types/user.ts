@@ -13,6 +13,7 @@ export type SignUpData = {
 
 export type UserProfile = {
   username: string;
+  role?: 'admin' | 'approver' | 'user' | string;
   demography?: {
     startedClimbing: string;
     name?: string;
