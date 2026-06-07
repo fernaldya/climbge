@@ -4,6 +4,7 @@ import type { LastClimb, WeeklyClimbSummary, HistoricalClimb, GradeSystem,
     CommitSessionPayload, CommitSessionResponse, ClimbLocations,
     ApprovalQueue, ApprovalDecision
  } from '../types/climb';
+import type { NewsPost } from '../types/news';
 import { joinURL } from "./url.ts";
 
 type ApiErrorCode =
@@ -156,6 +157,11 @@ export async function apiHistoricalClimb(): Promise<HistoricalClimb[]> {
   const json = await fetchJSON<HistoryResp>("/api/history");
   const data: any = json ?? {};
   return Array.isArray(data) ? data : (data.history ?? []);
+}
+
+export async function apiNews(): Promise<NewsPost[]> {
+  const json = await fetchJSON<{ news: NewsPost[] }>("/api/news");
+  return json?.news ?? [];
 }
 
 export async function apiSaveMeasurementsMetric(payload: {
