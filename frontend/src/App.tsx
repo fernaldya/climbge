@@ -16,6 +16,7 @@ import { HomeTab } from './tabs/HomePage';
 import { ClimbTab } from './tabs/ClimbPage';
 import { HistoryTab } from './tabs/HistoryPage';
 import { ProfileTab } from './tabs/ProfilePage';
+import { BuddiesTab } from './tabs/BuddiesPage';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -99,6 +100,7 @@ export default function App() {
         <Route index element={<Navigate to="profile" replace />} />
         <Route path="home" element={<HomeTab />} />
         <Route path="climb" element={<ClimbTab />} />
+        <Route path="buddies" element={<BuddiesTab />} />
         <Route path="history" element={<HistoryTab />} />
         <Route path="profile" element={
             <RequireAuth>

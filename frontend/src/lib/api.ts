@@ -5,6 +5,9 @@ import type { LastClimb, WeeklyClimbSummary, HistoricalClimb, GradeSystem,
     ApprovalQueue, ApprovalDecision
  } from '../types/climb';
 import type { NewsPost } from '../types/news';
+import type {
+  BuddySummary, BuddyDetail, BuddyInvite, BuddyFeedItem, PlannedClimb,
+} from '../types/buddy';
 import { joinURL } from "./url.ts";
 
 type ApiErrorCode =
@@ -321,4 +324,92 @@ export async function apiCommitClimbSession(
     return (body as CommitSessionResponse) ?? { ok: false, error: "Request failed" };
   }
   return body as CommitSessionResponse;
+}
+
+// ===== Buddy Hub =====
+async function request<T>(
+  path: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+  body?: unknown,
+): Promise<T> {
+  try {
+    const res = await fetch(joinURL(path), {
+      method,
+      credentials: 'include',
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    return json<T>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
+  }
+}
+
+export async function apiListBuddies() {
+  const data = await request<{ buddies: BuddySummary[] }>('/api/buddies');
+  return data.buddies;
+}
+
+export function apiGetBuddy(id: string) {
+  return request<BuddyDetail>(`/api/buddies/${id}`);
+}
+
+export function apiCreateBuddy(name: string) {
+  return request<BuddySummary>('/api/buddies', 'POST', { name });
+}
+
+export function apiRenameBuddy(id: string, name: string) {
+  return request<{ ok: boolean; name: string }>(`/api/buddies/${id}`, 'PUT', { name });
+}
+
+export function apiLeaveBuddy(id: string) {
+  return request<{ ok: boolean }>(`/api/buddies/${id}/leave`, 'POST');
+}
+
+export function apiRemoveBuddyMember(id: string, targetUserId: string) {
+  return request<{ ok: boolean }>(`/api/buddies/${id}/members/${targetUserId}`, 'DELETE');
+}
+
+export function apiInviteBuddy(id: string, username: string) {
+  return request<BuddyInvite>(`/api/buddies/${id}/invites`, 'POST', { username });
+}
+
+export async function apiListBuddyInvites() {
+  const data = await request<{ invites: BuddyInvite[] }>('/api/buddy-invites');
+  return data.invites;
+}
+
+export function apiAcceptInvite(inviteId: string) {
+  return request<{ ok: boolean; buddy_id: string }>(`/api/buddy-invites/${inviteId}/accept`, 'POST');
+}
+
+export function apiDeclineInvite(inviteId: string) {
+  return request<{ ok: boolean }>(`/api/buddy-invites/${inviteId}/decline`, 'POST');
+}
+
+export async function apiBuddyFeed() {
+  const data = await request<{ buddies: BuddyFeedItem[] }>('/api/buddies/feed');
+  return data.buddies;
+}
+
+export async function apiListPlannedClimbs() {
+  const data = await request<{ plans: PlannedClimb[] }>('/api/planned-climbs');
+  return data.plans;
+}
+
+export function apiCreatePlannedClimb(payload: {
+  gym: string;
+  city?: string;
+  country?: string;
+  planned_date: string;
+  planned_time?: string;
+  share_all: boolean;
+  buddy_ids: string[];
+}) {
+  return request<PlannedClimb>('/api/planned-climbs', 'POST', payload);
+}
+
+export function apiCancelPlannedClimb(planId: string) {
+  return request<{ ok: boolean }>(`/api/planned-climbs/${planId}`, 'DELETE');
 }
