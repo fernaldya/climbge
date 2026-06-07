@@ -8,6 +8,7 @@ import { SignupPage } from './SignupPage';
 import { ForgotPasswordPage } from './ForgotPasswordPage';
 import { ResetPasswordPage } from './ResetPasswordPage';
 import { cn } from './components/ui/utils';
+import { NewsboardAutoPopup } from './components/Newsboard';
 import { Home, Mountain, History, User } from "lucide-react";
 
 // Tab pages
@@ -121,6 +122,9 @@ export default function App() {
 function AppShell({ profile: _profile, onLogout: _onLogout }: { profile: UserProfile | null; onLogout: () => void }) {
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Weekly news popup, shown on any tab after login */}
+      <NewsboardAutoPopup />
+
       {/* Active tab content */}
       <main className="flex-1 p-4 pb-[4.5rem] sm:pb-20">
         <Outlet />

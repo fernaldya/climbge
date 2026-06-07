@@ -5,6 +5,7 @@ import { Skeleton } from "../components/ui/skeleton";
 import { TrendingUp, Trophy, RotateCcw, BicepsFlexed, Calendar, MapPin } from "lucide-react";
 import { apiLastClimb, apiWeeklySummary } from "../lib/api";
 import { HangboardTimer } from "../components/HangboardTimer";
+import { Newsboard } from "../components/Newsboard";
 import type { WeeklyClimbSummary, LastClimb } from "../types/climb";
 
 
@@ -159,6 +160,7 @@ export function HomeTab() {
 
       {/* OTW feature */}
       <div className="mt-6 grid grid-cols-2 gap-4">
+        <Newsboard />
         <HangboardTimer />
       </div>
 
