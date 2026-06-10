@@ -33,13 +33,56 @@ function initials(name: string): string {
   return (first + second).toUpperCase() || "?";
 }
 
-function EmptyState({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+function SectionHeader({ icon, title, action }: {
+  icon: React.ReactNode;
+  title: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-orange-200 bg-orange-50/50 px-4 py-6 text-center">
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-500">
+    <div className="flex items-center justify-between">
+      <h2 className="flex items-center gap-2.5 text-base font-semibold">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-100 text-orange-500">
+          {icon}
+        </span>
+        {title}
+      </h2>
+      {action}
+    </div>
+  );
+}
+
+function SectionAction({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...props}
+      className="flex h-8 items-center gap-1 rounded-lg px-2.5 text-sm font-medium text-orange-600 transition hover:bg-orange-50 hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
+    >
+      {children}
+    </button>
+  );
+}
+
+function EmptyState({ icon, action, children }: {
+  icon: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-orange-200 bg-orange-50/50 px-4 py-8 text-center">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-100 text-orange-500">
         {icon}
       </span>
-      <p className="text-sm text-muted-foreground">{children}</p>
+      <p className="max-w-[30ch] text-sm text-muted-foreground">{children}</p>
+      {action}
+    </div>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-14 w-full rounded-xl" />
+      <Skeleton className="h-14 w-full rounded-xl" />
     </div>
   );
 }
@@ -52,6 +95,7 @@ export function BuddiesTab() {
   const [loading, setLoading] = useState(true);
 
   const [creating, setCreating] = useState(false);
+  const [createBusy, setCreateBusy] = useState(false);
   const [newName, setNewName] = useState("");
   const [createErr, setCreateErr] = useState<string | null>(null);
 
@@ -71,8 +115,9 @@ export function BuddiesTab() {
   }, []);
 
   async function createGroup() {
-    if (!newName.trim()) return;
+    if (!newName.trim() || createBusy) return;
     setCreateErr(null);
+    setCreateBusy(true);
     try {
       await apiCreateBuddy(newName.trim());
       setNewName("");
@@ -80,6 +125,8 @@ export function BuddiesTab() {
       await refresh();
     } catch (e: any) {
       setCreateErr(e?.message || "Could not create group.");
+    } finally {
+      setCreateBusy(false);
     }
   }
 
@@ -95,53 +142,80 @@ export function BuddiesTab() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <button
           onClick={() => navigate("/app/home")}
-          className="p-1 -ml-1 text-gray-600 hover:text-orange-500 transition"
+          className="-ml-1 rounded-lg p-1 text-gray-500 transition hover:bg-orange-50 hover:text-orange-500"
           aria-label="Back"
         >
           <ArrowLeft className="h-6 w-6" />
         </button>
-        <h1 className="text-xl font-semibold flex items-center gap-2">
-          <Users className="h-5 w-5 text-orange-500" /> Buddy Hub
-        </h1>
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-500">
+          <Users className="h-5 w-5" />
+        </span>
+        <div>
+          <h1 className="text-xl font-semibold leading-tight">Buddy Hub</h1>
+          <p className="text-sm text-muted-foreground">Plan sessions and follow your crew</p>
+        </div>
       </div>
 
       <InviteBanner onChanged={refresh} />
 
       {/* My buddy groups */}
       <Card className="rounded-2xl">
-        <CardContent className="p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <Users className="h-5 w-5 text-orange-500" /> My buddy groups
-            </h2>
-            <Button variant="ghost" className="h-8 px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => setCreating((v) => !v)}>
-              <Plus className="h-4 w-4 mr-1" /> New
-            </Button>
-          </div>
+        <CardContent className="p-5 pt-5 space-y-4">
+          <SectionHeader
+            icon={<Users className="h-4 w-4" />}
+            title="My Buddies"
+            action={
+              <SectionAction onClick={() => setCreating((v) => !v)}>
+                <Plus className="h-4 w-4" /> New
+              </SectionAction>
+            }
+          />
 
           {creating && (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex gap-2">
                 <Input
                   placeholder="Group name"
                   value={newName}
                   maxLength={100}
+                  autoFocus
                   onChange={(e) => setNewName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") createGroup(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") createGroup();
+                    if (e.key === "Escape") setCreating(false);
+                  }}
                 />
-                <Button onClick={createGroup} disabled={!newName.trim()}>Create</Button>
+                <Button
+                  className="bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
+                  onClick={createGroup}
+                  disabled={!newName.trim() || createBusy}
+                >
+                  {createBusy ? "Creating…" : "Create"}
+                </Button>
               </div>
-              {createErr && <p className="text-xs text-destructive">{createErr}</p>}
+              {createErr && <p className="text-xs text-red-600">{createErr}</p>}
             </div>
           )}
 
           {loading ? (
-            <Skeleton className="h-10 w-full" />
+            <ListSkeleton />
           ) : groups.length === 0 ? (
-            <EmptyState icon={<Users className="h-5 w-5" />}>
+            <EmptyState
+              icon={<Users className="h-5 w-5" />}
+              action={
+                !creating && (
+                  <button
+                    onClick={() => setCreating(true)}
+                    className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600"
+                  >
+                    Create a group
+                  </button>
+                )
+              }
+            >
               No groups yet. Create one and invite your climbing buddies.
             </EmptyState>
           ) : (
@@ -150,21 +224,23 @@ export function BuddiesTab() {
                 <li key={g.id}>
                   <button
                     onClick={() => setOpenGroup(g.id)}
-                    className="group flex w-full items-center justify-between rounded-xl border border-orange-100 bg-orange-50/40 p-3 text-left transition hover:border-orange-200 hover:bg-orange-50"
+                    className="group flex w-full items-center justify-between gap-3 rounded-xl border p-3 text-left transition hover:border-orange-200 hover:bg-orange-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
                   >
-                    <span className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-orange-500">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-500">
                         <Users className="h-4 w-4" />
                       </span>
-                      <span className="flex items-center gap-2">
-                        <span className="font-medium">{g.name}</span>
-                        {g.your_role === "owner" && <Badge variant="secondary">owner</Badge>}
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2">
+                          <span className="truncate font-medium">{g.name}</span>
+                          {g.your_role === "owner" && <Badge variant="secondary" size="sm">owner</Badge>}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {g.member_count} member{g.member_count === 1 ? "" : "s"}
+                        </span>
                       </span>
                     </span>
-                    <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {g.member_count} member{g.member_count === 1 ? "" : "s"}
-                      <ChevronRight className="h-4 w-4 text-orange-400 transition group-hover:translate-x-0.5" />
-                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-orange-400 transition group-hover:translate-x-0.5" />
                   </button>
                 </li>
               ))}
@@ -175,40 +251,49 @@ export function BuddiesTab() {
 
       {/* My plans */}
       <Card className="rounded-2xl">
-        <CardContent className="p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              <CalendarClock className="h-5 w-5 text-orange-500" /> My planned climbs
-            </h2>
-            <Button className="h-8 px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50" onClick={() => setPlanOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Plan
-            </Button>
-          </div>
+        <CardContent className="p-5 pt-5 space-y-4">
+          <SectionHeader
+            icon={<CalendarClock className="h-4 w-4" />}
+            title="My Plans"
+            action={
+              <SectionAction onClick={() => setPlanOpen(true)}>
+                <Plus className="h-4 w-4" /> Plan
+              </SectionAction>
+            }
+          />
 
           {loading ? (
-            <Skeleton className="h-10 w-full" />
+            <ListSkeleton />
           ) : plans.length === 0 ? (
-            <EmptyState icon={<CalendarClock className="h-5 w-5" />}>
+            <EmptyState
+              icon={<CalendarClock className="h-5 w-5" />}
+              action={
+                <button
+                  onClick={() => setPlanOpen(true)}
+                  className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600"
+                >
+                  Plan a climb
+                </button>
+              }
+            >
               No upcoming plans. Let your buddies know where you're headed.
             </EmptyState>
           ) : (
-            <ul className="space-y-2">
+            <ul className="divide-y divide-orange-100/80">
               {plans.map((p) => (
-                <li key={p.id} className="flex items-center justify-between rounded-xl border border-orange-100 bg-orange-50/40 p-3">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-100 text-orange-500">
+                <li key={p.id} className="flex items-center justify-between gap-3 py-3 first:pt-1 last:pb-0">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-500">
                       <MapPin className="h-4 w-4" />
                     </span>
-                    <div className="text-sm">
-                      <div className="font-medium">{p.gym}</div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <CalendarClock className="h-3.5 w-3.5" /> {formatPlan(p)}
-                      </div>
+                    <div className="min-w-0 text-sm">
+                      <div className="truncate font-medium">{p.gym}</div>
+                      <div className="text-xs text-muted-foreground">{formatPlan(p)}</div>
                     </div>
                   </div>
                   <button
                     onClick={() => cancelPlan(p.id)}
-                    className="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                    className="shrink-0 rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
                     title="Cancel plan"
                     aria-label="Cancel plan"
                   >
@@ -223,37 +308,38 @@ export function BuddiesTab() {
 
       {/* Buddy feed */}
       <Card className="rounded-2xl">
-        <CardContent className="p-5 space-y-3">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <MapPin className="h-5 w-5 text-orange-500" /> Where your buddies climb
-          </h2>
+        <CardContent className="p-5 pt-5 space-y-4">
+          <SectionHeader icon={<MapPin className="h-4 w-4" />} title="Where your buddies climb" />
+
           {loading ? (
-            <Skeleton className="h-16 w-full" />
+            <ListSkeleton />
           ) : feed.length === 0 ? (
             <EmptyState icon={<MapPin className="h-5 w-5" />}>
               No buddies yet. Invite people to a group to see their climbs.
             </EmptyState>
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-orange-100/80">
               {feed.map((b) => (
-                <li key={b.user_id} className="flex gap-3 rounded-xl border border-orange-100 bg-orange-50/40 p-3">
+                <li key={b.user_id} className="flex gap-3 py-3 first:pt-1 last:pb-0">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-sm font-semibold text-orange-600">
                     {initials(b.name || b.username)}
                   </span>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="font-medium">{b.name || b.username}</div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{b.name || b.username}</div>
+                    <div className="text-xs text-muted-foreground">
                       {b.last_climb?.location
                         ? `Last climbed at ${b.last_climb.location} · ${formatDate(b.last_climb.climb_date)}`
                         : "No climbs logged yet"}
                     </div>
                     {b.planned_climbs.length > 0 && (
-                      <div className="space-y-0.5 pt-1">
+                      <div className="flex flex-wrap gap-1.5 pt-1.5">
                         {b.planned_climbs.map((p) => (
-                          <div key={p.id} className="flex items-center gap-1 text-xs font-medium text-orange-600">
-                            <CalendarClock className="h-3.5 w-3.5 shrink-0" /> Planning {p.gym} · {formatPlan(p)}
-                          </div>
+                          <span
+                            key={p.id}
+                            className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700"
+                          >
+                            <CalendarClock className="h-3 w-3 shrink-0" /> {p.gym} · {formatPlan(p)}
+                          </span>
                         ))}
                       </div>
                     )}
