@@ -1,6 +1,9 @@
+import logging
 from psycopg.rows import dict_row
 from utils.connect_db import pool
 from utils.relative_day import get_relative_day
+
+logger = logging.getLogger("climbge-api")
 
 
 def fetch_climb_history(user_id: str):
@@ -37,7 +40,8 @@ def fetch_climb_history(user_id: str):
         ]
         return {'history': history}, 200
 
-    except Exception as e:
+    except Exception:
+        logger.exception("history fetch failed user_id=%s", user_id)
         return {"error": {"code": "db_error", "message": "Could not fetch history!"}}, 500
 
 
@@ -78,7 +82,8 @@ def fetch_last_climb(user_id: str):
         }
         return last_climb, 200
 
-    except Exception as e:
+    except Exception:
+        logger.exception("last_climb fetch failed user_id=%s", user_id)
         return {"error": {"code": "db_error", "message": "Could not fetch last climb data!"}}, 500
 
 def fetch_weekly_stats(user_id: str):
@@ -114,5 +119,6 @@ def fetch_weekly_stats(user_id: str):
         }
         return weekly_stats, 200
 
-    except Exception as e:
+    except Exception:
+        logger.exception("weekly_stats fetch failed user_id=%s", user_id)
         return {"error": {"code": "db_error", "message": "Could not fetch weekly climb statistics!"}}, 500

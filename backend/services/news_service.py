@@ -1,6 +1,9 @@
+import logging
 from psycopg.rows import dict_row
 from utils.connect_db import pool
 from utils.http import err
+
+logger = logging.getLogger("climbge-api")
 
 
 def fetch_news():
@@ -18,4 +21,5 @@ def fetch_news():
         return {"news": rows}, 200
 
     except Exception:
+        logger.exception("news fetch failed")
         return err("db_error", "Could not fetch news post!", 500)

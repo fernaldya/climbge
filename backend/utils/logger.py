@@ -1,15 +1,14 @@
 # backend/app/logging_config.py
-import logging, os, sys, time
-from logging.handlers import TimedRotatingFileHandler
+import logging
+import os
+import sys
+import time
 from typing import Optional
 from flask import Flask, g, request, session
 
 def setup_logging(
     name: str,
-    log_file_path: str,
     level: int = logging.INFO,
-    when: str = "midnight",
-    backup_count: int = 7,
 ) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -19,19 +18,7 @@ def setup_logging(
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    if log_file_path:
-        os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-
     if not logger.handlers:
-        # File (daily rotation)
-        fh = TimedRotatingFileHandler(
-            log_file_path, when=when, interval=1,
-            backupCount=backup_count, encoding="utf-8"
-        )
-        fh.setFormatter(fmt)
-        logger.addHandler(fh)
-
-        # Stdout
         sh = logging.StreamHandler(sys.stdout)
         sh.setFormatter(fmt)
         logger.addHandler(sh)
@@ -63,7 +50,9 @@ def install_api_request_logging(app: Flask, logger: logging.Logger) -> None:
             or request.remote_addr
         )
 
-        logger.info(
+        log = logger.error if resp.status_code >= 500 else logger.info
+
+        log(
             "%s %s user=%s status=%s duration=%.1fms ip=%s",
             request.method,
             request.path,
@@ -73,9 +62,3 @@ def install_api_request_logging(app: Flask, logger: logging.Logger) -> None:
             ip,
         )
         return resp
-
-    @app.errorhandler(Exception)
-    def _on_error(e):
-        # Avoid logging sensitive payloads; keep stack trace.
-        logger.exception("unhandled_exception path=%s method=%s", request.path, request.method)
-        return {"error": "internal_server_error"}, 500

@@ -1,6 +1,6 @@
 # routes/climb.py
 from __future__ import annotations
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request
 from utils.auth import login_required
 from utils.security import current_user_id
 from services.climb_service import fetch_grades, commit_session_service, fetch_climb_locations
