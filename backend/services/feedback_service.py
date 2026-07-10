@@ -1,8 +1,11 @@
+import logging
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation
 from utils.http import err
 from utils.connect_db import pool
 from string import capwords
+
+logger = logging.getLogger("climbge-api")
 
 def submit_feedback(user_id: str, text: str):
     """Inserts user feedback"""
@@ -22,8 +25,10 @@ def submit_feedback(user_id: str, text: str):
                 "INSERT INTO public.user_feedback (user_id, username, feedback) VALUES (%s, %s, %s)",
                 (user_id, row["username"], text),
             )
+        logger.info("feedback_submitted user_id=%s length=%s", user_id, len(text))
         return {"ok": True}, 200
     except Exception:
+        logger.exception("feedback_submit failed user_id=%s", user_id)
         return err("db_error", "Database error.", 500)
 
 
@@ -57,11 +62,13 @@ def submit_new_climb_location(user_id: str, payload: dict):
                 (capwords(gym_name), capwords(gym_chain) if gym_chain else None, gym_location.upper(), capwords(country), user_id),
             )
 
+        logger.info("climb_location_submitted user_id=%s country=%s location=%s", user_id, capwords(country), gym_location.upper())
         return {"ok": True}, 200
         
     except UniqueViolation:
         return err("already_exists", "This gym location has already been submitted.", 409)
     except Exception:
+        logger.exception("climb_location_submit failed user_id=%s", user_id)
         return err("db_error", "Database error.", 500)
 
 
@@ -103,11 +110,13 @@ def submit_new_grade_system(user_id: str, payload: dict):
                 (grade_name, grade_list, climb_type, user_id),
             )
 
+        logger.info("grade_system_submitted user_id=%s grades=%s climb_type=%s", user_id, len(grade_list), climb_type)
         return {"ok": True}, 200
         
     except UniqueViolation:
         return err("already_exists", "This grade system has already been submitted.", 409)
     except Exception:
+        logger.exception("grade_system_submit failed user_id=%s", user_id)
         return err("db_error", "Database error.", 500)
 
 
@@ -132,6 +141,7 @@ def get_approval_queue():
             climb_queue = cur.fetchall()
             return {"grade_queue": grade_queue, "climb_queue": climb_queue}, 200
     except Exception:
+        logger.exception("approval_queue failed")
         return err("db_error", "Database error.", 500)
 
 
@@ -202,7 +212,27 @@ def submit_approval_decision(user_id: str, payload: dict):
             with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(f"CALL {proc}(%s, %s, %s, %s)", (item_id, user_id, is_approved, None))
             results.append({"itemType": item_type, "itemId": item_id, "ok": True, "action": action})
+            logger.info(
+                "approval_decision_applied user_id=%s item_type=%s item_id=%s action=%s",
+                user_id,
+                item_type,
+                item_id,
+                action,
+            )
         except Exception:
+            logger.exception(
+                "approval_decision failed user_id=%s item_type=%s item_id=%s action=%s",
+                user_id,
+                item_type,
+                item_id,
+                action,
+            )
             results.append({"itemType": item_type, "itemId": item_id, "ok": False, "error": "Database error"})
 
+    logger.info(
+        "approval_decision_batch completed user_id=%s total=%s succeeded=%s",
+        user_id,
+        len(results),
+        sum(1 for r in results if r["ok"]),
+    )
     return {"ok": all(r["ok"] for r in results), "results": results}, 200

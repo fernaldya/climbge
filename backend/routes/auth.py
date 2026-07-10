@@ -1,5 +1,5 @@
 from __future__ import annotations
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request
 from services.auth_service import (
     signup_user,
     login_with_password,

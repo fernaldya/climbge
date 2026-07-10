@@ -1,7 +1,10 @@
+import logging
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation
 from utils.connect_db import pool
 from utils.http import err
+
+logger = logging.getLogger("climbge-api")
 
 # Max number of buddy groups a single user may *own*. You can be a viewer in
 # unlimited groups.
@@ -55,8 +58,15 @@ def _remove_member(cur, buddy_id, target_uid):
         heir = cur.fetchone()
         if not heir:
             # Last member leaving -> disband the whole group.
+            logger.info("buddy_group disbanded buddy_id=%s owner_id=%s", buddy_id, target_uid)
             cur.execute("DELETE FROM public.buddies WHERE id = %s", (buddy_id,))
             return
+        logger.info(
+            "buddy_group owner_transferred buddy_id=%s old_owner_id=%s new_owner_id=%s",
+            buddy_id,
+            target_uid,
+            heir["user_id"],
+        )
         cur.execute(
             "UPDATE public.buddy_members SET user_role = 'owner' WHERE buddy_id = %s AND user_id = %s",
             (buddy_id, heir["user_id"]),
@@ -111,6 +121,7 @@ def list_buddies(uid):
             ]
         }, 200
     except Exception:
+        logger.exception("buddies list failed user_id=%s", uid)
         return err("db_error", "Could not fetch buddy groups.", 500)
 
 
@@ -147,6 +158,7 @@ def create_buddy(uid, name):
                 "INSERT INTO public.buddy_members (buddy_id, user_id, user_role) VALUES (%s, %s, 'owner')",
                 (grp["id"], uid),
             )
+        logger.info("buddy_created user_id=%s buddy_id=%s", uid, grp["id"])
         return {
             "id": str(grp["id"]),
             "name": grp["name"],
@@ -155,6 +167,7 @@ def create_buddy(uid, name):
             "your_role": "owner",
         }, 201
     except Exception:
+        logger.exception("buddy_create failed user_id=%s", uid)
         return err("db_error", "Could not create buddy group.", 500)
 
 
@@ -202,6 +215,7 @@ def get_buddy(uid, buddy_id):
             ],
         }, 200
     except Exception:
+        logger.exception("buddy_get failed user_id=%s buddy_id=%s", uid, buddy_id)
         return err("db_error", "Could not fetch buddy group.", 500)
 
 
@@ -220,8 +234,10 @@ def rename_buddy(uid, buddy_id, name):
             if role != "owner":
                 return err("forbidden", "Only the group owner can rename it.", 403)
             cur.execute("UPDATE public.buddies SET name = %s WHERE id = %s", (name, buddy_id))
+        logger.info("buddy_renamed user_id=%s buddy_id=%s", uid, buddy_id)
         return {"ok": True, "name": name}, 200
     except Exception:
+        logger.exception("buddy_rename failed user_id=%s buddy_id=%s", uid, buddy_id)
         return err("db_error", "Could not rename buddy group.", 500)
 
 
@@ -232,8 +248,10 @@ def leave_buddy(uid, buddy_id):
             if role is None:
                 return err("forbidden", "You are not a member of this group.", 403)
             _remove_member(cur, buddy_id, uid)
+        logger.info("buddy_left user_id=%s buddy_id=%s", uid, buddy_id)
         return {"ok": True}, 200
     except Exception:
+        logger.exception("buddy_leave failed user_id=%s buddy_id=%s", uid, buddy_id)
         return err("db_error", "Could not leave buddy group.", 500)
 
 
@@ -250,8 +268,10 @@ def remove_buddy_member(uid, buddy_id, target_uid):
             if _require_member(cur, buddy_id, target_uid) is None:
                 return err("not_found", "That user is not a member of this group.", 404)
             _remove_member(cur, buddy_id, target_uid)
+        logger.info("buddy_member_removed user_id=%s buddy_id=%s target_user_id=%s", uid, buddy_id, target_uid)
         return {"ok": True}, 200
     except Exception:
+        logger.exception("buddy_member_remove failed user_id=%s buddy_id=%s target_user_id=%s", uid, buddy_id, target_uid)
         return err("db_error", "Could not remove member.", 500)
 
 
@@ -292,6 +312,7 @@ def list_my_invites(uid):
             ]
         }, 200
     except Exception:
+        logger.exception("buddy_invites list failed user_id=%s", uid)
         return err("db_error", "Could not fetch invites.", 500)
 
 
@@ -329,6 +350,13 @@ def invite_to_buddy(uid, buddy_id, username):
             except UniqueViolation:
                 return err("invite_exists", "That user already has a pending invite.", 409)
             inv = cur.fetchone()
+        logger.info(
+            "buddy_invite_created user_id=%s buddy_id=%s target_user_id=%s invite_id=%s",
+            uid,
+            buddy_id,
+            target["user_id"],
+            inv["id"],
+        )
         return {
             "id": str(inv["id"]),
             "buddy_id": str(buddy_id),
@@ -337,6 +365,7 @@ def invite_to_buddy(uid, buddy_id, username):
             "created_at": inv["created_at"].isoformat(),
         }, 201
     except Exception:
+        logger.exception("buddy_invite failed user_id=%s buddy_id=%s", uid, buddy_id)
         return err("db_error", "Could not send invite.", 500)
 
 
@@ -368,8 +397,10 @@ def accept_invite(uid, invite_id):
                 "UPDATE public.buddy_invites SET status = 'accepted' WHERE id = %s",
                 (invite_id,),
             )
+        logger.info("buddy_invite_accepted user_id=%s invite_id=%s buddy_id=%s", uid, invite_id, inv["buddy_id"])
         return {"ok": True, "buddy_id": str(inv["buddy_id"])}, 200
     except Exception:
+        logger.exception("buddy_invite_accept failed user_id=%s invite_id=%s", uid, invite_id)
         return err("db_error", "Could not accept invite.", 500)
 
 
@@ -388,8 +419,10 @@ def decline_invite(uid, invite_id):
             )
             if not cur.fetchone():
                 return err("not_found", "Invite not found.", 404)
+        logger.info("buddy_invite_declined user_id=%s invite_id=%s", uid, invite_id)
         return {"ok": True}, 200
     except Exception:
+        logger.exception("buddy_invite_decline failed user_id=%s invite_id=%s", uid, invite_id)
         return err("db_error", "Could not decline invite.", 500)
 
 
@@ -416,6 +449,7 @@ def list_planned_climbs(uid):
             rows = cur.fetchall()
         return {"plans": [_plan_dict(r) for r in rows]}, 200
     except Exception:
+        logger.exception("planned_climbs list failed user_id=%s", uid)
         return err("db_error", "Could not fetch planned climbs.", 500)
 
 
@@ -461,9 +495,16 @@ def create_planned_climb(uid, payload):
                     "INSERT INTO public.planned_climb_groups (planned_climb_id, buddy_id) VALUES (%s, %s)",
                     (plan["id"], bid),
                 )
+        logger.info(
+            "planned_climb_created user_id=%s plan_id=%s shared_groups=%s",
+            uid,
+            plan["id"],
+            len(buddy_ids),
+        )
         plan["buddy_ids"] = buddy_ids
         return _plan_dict(plan), 201
     except Exception:
+        logger.exception("planned_climb_create failed user_id=%s", uid)
         return err("db_error", "Could not save planned climb.", 500)
 
 
@@ -476,8 +517,10 @@ def cancel_planned_climb(uid, plan_id):
             )
             if not cur.fetchone():
                 return err("not_found", "Planned climb not found.", 404)
+        logger.info("planned_climb_cancelled user_id=%s plan_id=%s", uid, plan_id)
         return {"ok": True}, 200
     except Exception:
+        logger.exception("planned_climb_cancel failed user_id=%s plan_id=%s", uid, plan_id)
         return err("db_error", "Could not cancel planned climb.", 500)
 
 
@@ -559,6 +602,7 @@ def buddy_feed(uid):
             )
         return {"buddies": feed}, 200
     except Exception:
+        logger.exception("buddy_feed failed user_id=%s", uid)
         return err("db_error", "Could not fetch buddy feed.", 500)
 
 
