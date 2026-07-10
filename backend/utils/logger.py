@@ -50,7 +50,7 @@ def install_api_request_logging(app: Flask, logger: logging.Logger) -> None:
             or request.remote_addr
         )
 
-        log = logger.error if resp.status_code >= 500 else logger.info
+        log = logger.warning if resp.status_code >= 500 else logger.info
 
         log(
             "%s %s user=%s status=%s duration=%.1fms ip=%s",

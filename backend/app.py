@@ -97,7 +97,7 @@ if os.getenv("FLASK_ENV") == "production":
                 event_level=logging.ERROR, # send error+ logs as Sentry events
             ),
         ],
-        send_default_pii=env_flag("SENTRY_SEND_DEFAULT_PII", True),
+        send_default_pii=env_flag("SENTRY_SEND_DEFAULT_PII", False),
         enable_logs=env_flag("SENTRY_ENABLE_LOGS", False),
     )
 
