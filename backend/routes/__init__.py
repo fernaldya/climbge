@@ -5,6 +5,7 @@ from .feedback import feedback_bp
 from .user_stats import stats_bp
 from .climb import climb_bp
 from .news import news_bp
+from .buddy import buddy_bp
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 api_bp.register_blueprint(auth_bp)
@@ -13,3 +14,4 @@ api_bp.register_blueprint(feedback_bp)
 api_bp.register_blueprint(stats_bp)
 api_bp.register_blueprint(climb_bp)
 api_bp.register_blueprint(news_bp)
+api_bp.register_blueprint(buddy_bp)

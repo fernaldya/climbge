@@ -1,8 +1,9 @@
 // src/pages/Home.tsx
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "../components/ui/card";
 import { Skeleton } from "../components/ui/skeleton";
-import { TrendingUp, Trophy, RotateCcw, BicepsFlexed, Calendar, MapPin } from "lucide-react";
+import { TrendingUp, Trophy, RotateCcw, BicepsFlexed, Calendar, MapPin, Users } from "lucide-react";
 import { apiLastClimb, apiWeeklySummary } from "../lib/api";
 import { HangboardTimer } from "../components/HangboardTimer";
 import { Newsboard } from "../components/Newsboard";
@@ -10,6 +11,7 @@ import type { WeeklyClimbSummary, LastClimb } from "../types/climb";
 
 
 export function HomeTab() {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<WeeklyClimbSummary | null>(null);
   const [lastClimb, setLastClimb] = useState<LastClimb | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,44 +166,17 @@ export function HomeTab() {
         <HangboardTimer />
       </div>
 
-      {/*/!* Feature grid - dummy buttons *!/*/}
-      {/*<div className="mt-6 grid grid-cols-2 gap-4">*/}
-      {/*  /!* Project Planning *!/*/}
-      {/*  <button className="flex flex-col items-start p-4 rounded-xl border border-blue-200 bg-blue-50 hover:opacity-90 transition">*/}
-      {/*    <div className="p-2 rounded-lg bg-white">*/}
-      {/*      <Mountain className="h-5 w-5 text-blue-500" />*/}
-      {/*    </div>*/}
-      {/*    <div className="mt-3 font-semibold">Project Planning</div>*/}
-      {/*    <div className="text-sm text-orange-700 text-left">Plan your climbing projects</div>*/}
-      {/*  </button>*/}
-
-      {/*  /!* Conditioning *!/*/}
-      {/*  <button className="flex flex-col items-start p-4 rounded-xl border border-green-200 bg-green-50 hover:opacity-90 transition">*/}
-      {/*    <div className="p-2 rounded-lg bg-white">*/}
-      {/*      <Dumbbell className="h-5 w-5 text-green-500" />*/}
-      {/*    </div>*/}
-      {/*    <div className="mt-3 font-semibold">Conditioning</div>*/}
-      {/*    <div className="text-sm text-orange-700 text-left">Strength &amp; fitness training</div>*/}
-      {/*  </button>*/}
-
-      {/*  /!* Beta Learning *!/*/}
-      {/*  <button className="flex flex-col items-start p-4 rounded-xl border border-purple-200 bg-purple-50 hover:opacity-90 transition">*/}
-      {/*    <div className="p-2 rounded-lg bg-white">*/}
-      {/*      <BookOpen className="h-5 w-5 text-purple-500" />*/}
-      {/*    </div>*/}
-      {/*    <div className="mt-3 font-semibold">Beta Learning</div>*/}
-      {/*    <div className="text-sm text-orange-700 text-left">Study techniques &amp; moves</div>*/}
-      {/*  </button>*/}
-
-      {/*  /!* Community Hub *!/*/}
-      {/*  <button className="flex flex-col items-start p-4 rounded-xl border border-orange-200 bg-orange-50 hover:opacity-90 transition">*/}
-      {/*    <div className="p-2 rounded-lg bg-white">*/}
-      {/*      <Users className="h-5 w-5 text-orange-500" />*/}
-      {/*    </div>*/}
-      {/*    <div className="mt-3 font-semibold">Community Hub</div>*/}
-      {/*    <div className="text-sm text-orange-700 text-left">Connect with climbers</div>*/}
-      {/*  </button>*/}
-      {/*</div>*/}
+      {/* Buddy Hub */}
+      <button
+        onClick={() => navigate("/app/buddies")}
+        className="mt-4 flex flex-col items-start p-4 rounded-xl border border-orange-200 bg-orange-50 hover:opacity-90 transition w-full"
+      >
+        <div className="p-2 rounded-lg bg-white">
+          <Users className="h-5 w-5 text-orange-500" />
+        </div>
+        <div className="mt-3 font-semibold">Buddy Hub</div>
+        <div className="text-sm text-orange-700 text-left">See where your buddies climb</div>
+      </button>
 
     </div>
   );

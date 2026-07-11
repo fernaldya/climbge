@@ -4,16 +4,16 @@ import os
 import secrets
 from datetime import date, datetime, timezone, timedelta
 from email.utils import parseaddr
-
-logger = logging.getLogger("climbge-api")
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation
 from flask import session
 from utils.http import err
-from utils.security import hash_password, verify_password, login_user, current_user_id
-from utils.mail import send_password_reset_email
+from utils.security import hash_password, verify_password, login_user
+from utils.mail import MailDeliveryError, send_password_reset_email
 from services.user_profile_service import fetch_user_profile
 from utils.connect_db import pool
+
+logger = logging.getLogger("climbge-api")
 
 
 def signup_user(data: dict):
@@ -84,11 +84,13 @@ def signup_user(data: dict):
                 )
     except UniqueViolation:
         return err("username_taken", "That username is already taken.", 409)
-    except Exception as e:
-        return err("server_error", f"Could not create user. {e}", 500)
+    except Exception:
+        logger.exception("signup failed")
+        return err("server_error", "Could not create user.", 500)
 
     # login session
     login_user(str(user_id))
+    logger.info("signup succeeded user_id=%s", user_id)
 
     # build response (same behavior as before)
     months_climbing = None
@@ -135,11 +137,13 @@ def login_with_password(username: str, password: str):
 
             profile = fetch_user_profile(row["user_id"])
     except Exception:
+        logger.exception("login failed db_error")
         return err("db_error", "Database error.", 500)
 
     session.clear()
     session["user_id"] = str(row["user_id"])
     session.permanent = True
+    logger.info("login succeeded user_id=%s", row["user_id"])
     return {"ok": True, "profile": profile}, 200
 
 def request_password_reset(email: str, username: str):
@@ -165,6 +169,7 @@ def request_password_reset(email: str, username: str):
                 )
             row = cur.fetchone()
     except Exception:
+        logger.exception("password_reset: failed to look up reset target")
         return err("db_error", "Database error.", 500)
 
     # Return success regardless to prevent enumeration
@@ -201,8 +206,12 @@ def request_password_reset(email: str, username: str):
 
     try:
         send_password_reset_email(row["email"], reset_link)
+    except MailDeliveryError:
+        logger.exception("password_reset: failed to send reset email user_id=%s", row["user_id"])
     except Exception:
-        logger.error("password_reset: failed to send reset email", exc_info=True)
+        logger.exception("password_reset: unexpected email failure user_id=%s", row["user_id"])
+    else:
+        logger.info("password_reset email_sent user_id=%s", row["user_id"])
 
     return {"ok": True}, 200
 
@@ -235,8 +244,10 @@ def reset_password_with_token(token: str, new_password: str):
                 (pwd_hash, row["user_id"]),
             )
     except Exception:
+        logger.exception("password_reset: failed to update password")
         return err("db_error", "Could not update password.", 500)
 
+    logger.info("password_reset completed user_id=%s", row["user_id"])
     return {"ok": True}, 200
 
 
@@ -246,14 +257,16 @@ def logout_user():
 
 def me_profile():
     try:
-        uid = current_user_id()
+        uid = session.get("user_id")
         if not uid:
             return {"authenticated": False}, 200
         row = fetch_user_profile(uid)
     except Exception:
+        logger.exception("me_profile failed")
         return {"authenticated": False}, 200
 
     if not row:
+        logger.warning("me_profile missing_user clearing_session user_id=%s", uid)
         session.clear()
         return {"authenticated": False}, 200
     return {"authenticated": True, "profile": row}, 200

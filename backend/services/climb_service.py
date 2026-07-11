@@ -1,9 +1,11 @@
 from typing import Any, Dict, List, Optional
+import logging
 from psycopg.rows import dict_row
 from utils.connect_db import pool
 from utils.parse_timestamp import parse_ts
 from collections import defaultdict
-import json
+
+logger = logging.getLogger("climbge-api")
 
 
 # ---------- Grade Systems ----------
@@ -181,13 +183,20 @@ def commit_session_service(user_id: str, payload: dict):
                 )
                 insert_session_routes(cur, session_id=session_id, routes=routes)
 
+        logger.info(
+            "climb_session committed user_id=%s session_id=%s routes=%s location=%s",
+            user_id,
+            session_id,
+            len(routes),
+            sess_location or "-",
+        )
         return {"ok": True, "session_id": session_id}, 200
 
     except ValueError as e:
         return {"error": str(e)}, 400
 
-    except Exception as e:
-        import traceback; traceback.print_exc()
+    except Exception:
+        logger.exception("climb_session failed user_id=%s routes=%s", user_id, len(routes))
         return {"error": "Something happened while trying to save the session."}, 500
 
 

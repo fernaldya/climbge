@@ -11,7 +11,11 @@ SMTP_PASS = os.getenv("SMTP_PASS")
 SMTP_TIMEOUT = int(os.getenv("SMTP_TIMEOUT", "10"))
 
 
-def send_password_reset_email(to_email: str, reset_link: str):
+class MailDeliveryError(Exception):
+    """Raised when an email cannot be delivered."""
+
+
+def send_password_reset_email(to_email: str, reset_link: str) -> None:
     msg = MIMEMultipart("alternative")
     msg["From"] = SMTP_USER
     msg["To"] = to_email
@@ -35,9 +39,12 @@ def send_password_reset_email(to_email: str, reset_link: str):
     msg.attach(MIMEText(html, "html"))
 
     ssl_context = ssl.create_default_context()
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as server:
-        server.ehlo()
-        server.starttls(context=ssl_context)
-        server.ehlo()
-        server.login(SMTP_USER, SMTP_PASS)
-        server.sendmail(SMTP_USER, to_email, msg.as_string())
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as server:
+            server.ehlo()
+            server.starttls(context=ssl_context)
+            server.ehlo()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+    except (smtplib.SMTPException, OSError, TimeoutError) as exc:
+        raise MailDeliveryError("password reset email delivery failed") from exc

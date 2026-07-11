@@ -1,7 +1,10 @@
 from functools import wraps
+import logging
 from flask import session
 from .http import err
 from .connect_db import pool
+
+logger = logging.getLogger("climbge-api")
 
 # Roles allowed to review (approve / reject) submissions.
 APPROVER_ROLES = ("admin", "approver")
@@ -29,7 +32,14 @@ def approver_required(fn):
         uid = session.get("user_id")
         if not uid:
             return err("unauthorized", "Not logged in.", 401)
-        if _get_user_role(uid) not in APPROVER_ROLES:
+        role = _get_user_role(uid)
+        if role not in APPROVER_ROLES:
+            logger.warning(
+                "approver_required denied user_id=%s role=%s endpoint=%s",
+                uid,
+                role,
+                fn.__name__,
+            )
             return err("forbidden", "You do not have permission to do this.", 403)
         return fn(*args, **kwargs)
     return wrapper

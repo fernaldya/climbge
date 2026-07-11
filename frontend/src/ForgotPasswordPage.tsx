@@ -87,7 +87,7 @@ export function ForgotPasswordPage() {
             {submitted ? (
               <div style={{ paddingTop: 16 }}>
                 <div style={{ background: 'rgba(247,166,45,0.12)', border: '1px solid rgba(247,166,45,0.3)', borderRadius: 10, padding: '14px 16px', color: '#F7A62D', fontSize: 14, marginBottom: 20 }}>
-                  If an account with that email exists, a reset link has been sent. Check your inbox.
+                  If an account with that email exists, a reset link has been sent. Check your inbox or spam folder.
                 </div>
                 <Link to="/login" style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textDecoration: 'none' }}>
                   ← Back to sign in
@@ -177,7 +177,7 @@ export function ForgotPasswordPage() {
             {submitted ? (
               <div>
                 <div style={{ background: 'rgba(247,166,45,0.12)', border: '1px solid rgba(247,166,45,0.3)', borderRadius: 10, padding: '14px 16px', color: '#F7A62D', fontSize: 14, marginBottom: 24 }}>
-                  If an account with that email exists, a reset link has been sent. Check your inbox.
+                  If an account with that email exists, a reset link has been sent. Check your inbox or spam folder.
                 </div>
                 <Link to="/login" style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textDecoration: 'none' }}>
                   ← Back to sign in
