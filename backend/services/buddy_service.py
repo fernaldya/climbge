@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation
@@ -16,6 +17,12 @@ MAX_FEED_PLANS_PER_BUDDY = 2
 
 
 # ---------- Authorization helpers ----------
+def _owner_limit_lock_key(uid):
+    digest = hashlib.blake2b(f"buddy-owner-limit:{uid}".encode("utf-8"), digest_size=8).digest()
+    key = int.from_bytes(digest, "big", signed=False)
+    return key - (1 << 64) if key >= (1 << 63) else key
+
+
 def _require_member(cur, buddy_id, uid):
     """Return the caller's role in the group, or None if they're not a member."""
     cur.execute(
@@ -134,6 +141,7 @@ def create_buddy(uid, name):
 
     try:
         with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT pg_advisory_xact_lock(%s)", (_owner_limit_lock_key(uid),))
             cur.execute(
                 "SELECT count(*) AS n FROM public.buddy_members WHERE user_id = %s AND user_role = 'owner'",
                 (uid,),
