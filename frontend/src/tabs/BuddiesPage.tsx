@@ -98,6 +98,7 @@ export function BuddiesTab() {
   const [createBusy, setCreateBusy] = useState(false);
   const [newName, setNewName] = useState("");
   const [createErr, setCreateErr] = useState<string | null>(null);
+  const [planErr, setPlanErr] = useState<string | null>(null);
 
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [planOpen, setPlanOpen] = useState(false);
@@ -131,11 +132,12 @@ export function BuddiesTab() {
   }
 
   async function cancelPlan(id: string) {
+    setPlanErr(null);
     try {
       await apiCancelPlannedClimb(id);
       setPlans((prev) => prev.filter((p) => p.id !== id));
     } catch {
-      /* ignore */
+      setPlanErr("Could not cancel plan. Please try again.");
     }
   }
 
@@ -261,6 +263,7 @@ export function BuddiesTab() {
               </SectionAction>
             }
           />
+          {planErr && <p className="text-xs text-red-600">{planErr}</p>}
 
           {loading ? (
             <ListSkeleton />

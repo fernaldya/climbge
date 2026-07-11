@@ -13,6 +13,7 @@ import type { BuddyInvite } from "../types/buddy";
 export function InviteBanner({ onChanged }: { onChanged?: () => void }) {
   const [invites, setInvites] = useState<BuddyInvite[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -28,13 +29,15 @@ export function InviteBanner({ onChanged }: { onChanged?: () => void }) {
 
   async function act(id: string, accept: boolean) {
     setBusyId(id);
+    setActionError(null);
     try {
       if (accept) await apiAcceptInvite(id);
       else await apiDeclineInvite(id);
       setInvites((prev) => prev.filter((i) => i.id !== id));
+      setActionError(null);
       if (accept) onChanged?.();
     } catch {
-      /* leave the invite in place so the user can retry */
+      setActionError(`Could not ${accept ? "accept" : "decline"} invite. Please try again.`);
     } finally {
       setBusyId(null);
     }
@@ -49,6 +52,7 @@ export function InviteBanner({ onChanged }: { onChanged?: () => void }) {
           <Mail className="h-5 w-5" />
           Buddy invites
         </div>
+        {actionError && <p className="text-sm text-red-600">{actionError}</p>}
         {invites.map((inv) => (
           <div key={inv.id} className="flex items-center justify-between gap-2">
             <div className="text-sm">

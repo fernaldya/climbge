@@ -95,6 +95,7 @@ export function BuddyGroupDialog({
 
   async function removeMember(userId: string) {
     if (!buddyId) return;
+    if (!window.confirm("Remove this member from the group?")) return;
     setBusy(true);
     try {
       await apiRemoveBuddyMember(buddyId, userId);
@@ -109,6 +110,7 @@ export function BuddyGroupDialog({
 
   async function leave() {
     if (!buddyId) return;
+    if (!window.confirm("Leave this group?")) return;
     setBusy(true);
     try {
       await apiLeaveBuddy(buddyId);
