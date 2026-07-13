@@ -40,6 +40,7 @@ export type PlannedClimb = {
   country: string | null;
   planned_date: string;
   planned_time: string | null;
+  planned_timestamp: string | null;
   buddy_ids?: string[];
 };
 
