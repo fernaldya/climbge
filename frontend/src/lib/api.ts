@@ -404,6 +404,7 @@ export function apiCreatePlannedClimb(payload: {
   country?: string;
   planned_date: string;
   planned_time?: string;
+  planned_timestamp: string;
   share_all: boolean;
   buddy_ids: string[];
 }) {

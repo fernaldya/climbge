@@ -30,6 +30,18 @@ function saveShareChoice(choice: ShareChoice) {
   }
 }
 
+function localDateInputValue(d = new Date()) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function plannedTimestamp(date: string, time: string) {
+  const localTime = time || "23:59:59.999";
+  return new Date(`${date}T${localTime}`).toISOString();
+}
+
 /**
  * Create a planned climb: pick a gym (from the climb-locations tree), a required
  * date and optional time, then choose which buddy groups can see it. The last
@@ -98,6 +110,7 @@ export function PlanClimbDialog({
         country: country || undefined,
         planned_date: date,
         planned_time: time || undefined,
+        planned_timestamp: plannedTimestamp(date, time),
         share_all: shareAll,
         buddy_ids: shareAll ? [] : selected,
       });
@@ -111,7 +124,7 @@ export function PlanClimbDialog({
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateInputValue();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
