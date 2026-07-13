@@ -1,11 +1,19 @@
 import hashlib
 import logging
+import os
+from datetime import date as date_cls
+from datetime import time as time_cls
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation
 from utils.connect_db import pool
 from utils.http import err
+from utils.parse_timestamp import parse_ts
 
 logger = logging.getLogger("climbge-api")
+
+DEFAULT_PLANNED_CLIMB_TIMEZONE = os.getenv("PLANNED_CLIMB_TIMEZONE", os.getenv("TZ", "Asia/Jakarta"))
 
 # Max number of buddy groups a single user may *own*. You can be a viewer in
 # unlimited groups.
@@ -14,6 +22,26 @@ MAX_BUDDY_GROUPS_PER_USER = 5
 # In the buddy feed, show at most this many of each buddy's upcoming planned
 # climbs (the earliest ones). A user can still create as many plans as they like.
 MAX_FEED_PLANS_PER_BUDDY = 2
+
+PLANNED_CLIMB_LEGACY_TIMESTAMP_SQL = """
+((pc.planned_date::timestamp + COALESCE(pc.planned_time, TIME '23:59:59.999')) AT TIME ZONE %s)
+"""
+
+PLANNED_CLIMB_UPCOMING_SQL = (
+    """
+(
+    (pc.planned_timestamp IS NOT NULL AND pc.planned_timestamp > NOW())
+    OR (
+        pc.planned_timestamp IS NULL
+        AND
+"""
+    + PLANNED_CLIMB_LEGACY_TIMESTAMP_SQL
+    + """
+        > NOW()
+    )
+)
+"""
+)
 
 
 # ---------- Authorization helpers ----------
@@ -31,6 +59,42 @@ def _require_member(cur, buddy_id, uid):
     )
     row = cur.fetchone()
     return row["user_role"] if row else None
+
+
+def _default_planned_tzinfo():
+    try:
+        return ZoneInfo(DEFAULT_PLANNED_CLIMB_TIMEZONE)
+    except ZoneInfoNotFoundError:
+        logger.warning(
+            "invalid planned climb timezone configured timezone=%s; falling back to UTC",
+            DEFAULT_PLANNED_CLIMB_TIMEZONE,
+        )
+        return timezone.utc
+
+
+def _parse_planned_datetime(planned_date, planned_time, planned_timestamp):
+    try:
+        parsed_date = date_cls.fromisoformat(planned_date)
+    except (TypeError, ValueError):
+        return None, None, None, err("invalid_input", "Date must be YYYY-MM-DD.", 422)
+
+    parsed_time = None
+    if planned_time:
+        try:
+            parsed_time = time_cls.fromisoformat(planned_time)
+        except (TypeError, ValueError):
+            return None, None, None, err("invalid_input", "Time must be HH:MM.", 422)
+
+    try:
+        parsed_timestamp = parse_ts(planned_timestamp)
+    except (TypeError, ValueError):
+        parsed_timestamp = None
+
+    if parsed_timestamp is None:
+        fallback_time = parsed_time or time_cls(23, 59, 59, 999000)
+        parsed_timestamp = datetime.combine(parsed_date, fallback_time, tzinfo=_default_planned_tzinfo())
+
+    return parsed_date, parsed_time, parsed_timestamp, None
 
 
 def _remove_member(cur, buddy_id, target_uid):
@@ -438,21 +502,25 @@ def decline_invite(uid, invite_id):
 def list_planned_climbs(uid):
     """The caller's own planned climbs with the groups each is shared into."""
     try:
-        with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
                 SELECT pc.id, pc.gym, pc.city, pc.country, pc.planned_date, pc.planned_time,
+                       pc.planned_timestamp,
                        COALESCE(
                            array_agg(pcg.buddy_id) FILTER (WHERE pcg.buddy_id IS NOT NULL),
                            '{}'
                        ) AS buddy_ids
                 FROM public.planned_climbs pc
                 LEFT JOIN public.planned_climb_groups pcg ON pcg.planned_climb_id = pc.id
-                WHERE pc.user_id = %s
+                WHERE pc.user_id = %s AND
+                """
+                + PLANNED_CLIMB_UPCOMING_SQL
+                + """
                 GROUP BY pc.id
-                ORDER BY pc.planned_date ASC, pc.planned_time ASC NULLS LAST
+                ORDER BY pc.planned_timestamp ASC NULLS LAST, pc.planned_date ASC, pc.planned_time ASC NULLS LAST
                 """,
-                (uid,),
+                (uid, DEFAULT_PLANNED_CLIMB_TIMEZONE),
             )
             rows = cur.fetchall()
         return {"plans": [_plan_dict(r) for r in rows]}, 200
@@ -465,6 +533,7 @@ def create_planned_climb(uid, payload):
     gym = (payload.get("gym") or "").strip()
     planned_date = (payload.get("planned_date") or "").strip()
     planned_time = (payload.get("planned_time") or "").strip() or None
+    planned_timestamp = (payload.get("planned_timestamp") or "").strip() or None
     city = (payload.get("city") or "").strip() or None
     country = (payload.get("country") or "").strip() or None
     share_all = bool(payload.get("share_all"))
@@ -474,6 +543,15 @@ def create_planned_climb(uid, payload):
         return err("invalid_input", "A gym is required.", 422)
     if not planned_date:
         return err("invalid_input", "A date is required.", 422)
+    parsed_date, parsed_time, parsed_timestamp, parse_error = _parse_planned_datetime(
+        planned_date,
+        planned_time,
+        planned_timestamp,
+    )
+    if parse_error:
+        return parse_error
+    if parsed_timestamp <= datetime.now(timezone.utc):
+        return err("invalid_input", "Plan time must be in the future.", 422)
 
     try:
         with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
@@ -491,11 +569,12 @@ def create_planned_climb(uid, payload):
 
             cur.execute(
                 """
-                INSERT INTO public.planned_climbs (user_id, gym, city, country, planned_date, planned_time)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                RETURNING id, gym, city, country, planned_date, planned_time
+                INSERT INTO public.planned_climbs
+                    (user_id, gym, city, country, planned_date, planned_time, planned_timestamp)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, gym, city, country, planned_date, planned_time, planned_timestamp
                 """,
-                (uid, gym, city, country, planned_date, planned_time),
+                (uid, gym, city, country, parsed_date, parsed_time, parsed_timestamp),
             )
             plan = cur.fetchone()
             for bid in buddy_ids:
@@ -539,7 +618,7 @@ def buddy_feed(uid):
     a group the caller also belongs to.
     """
     try:
-        with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
                 SELECT DISTINCT p.user_id, p.username, p.name
@@ -571,14 +650,17 @@ def buddy_feed(uid):
             cur.execute(
                 """
                 SELECT DISTINCT pc.id, pc.user_id, pc.gym, pc.city, pc.country,
-                       pc.planned_date, pc.planned_time
+                       pc.planned_date, pc.planned_time, pc.planned_timestamp
                 FROM public.planned_climbs pc
                 JOIN public.planned_climb_groups pcg ON pcg.planned_climb_id = pc.id
                 JOIN public.buddy_members me ON me.buddy_id = pcg.buddy_id AND me.user_id = %s
-                WHERE pc.user_id <> %s AND pc.planned_date >= CURRENT_DATE
-                ORDER BY pc.planned_date ASC, pc.planned_time ASC NULLS LAST
+                WHERE pc.user_id <> %s AND
+                """
+                + PLANNED_CLIMB_UPCOMING_SQL
+                + """
+                ORDER BY pc.planned_timestamp ASC NULLS LAST, pc.planned_date ASC, pc.planned_time ASC NULLS LAST
                 """,
-                (uid, uid),
+                (uid, uid, DEFAULT_PLANNED_CLIMB_TIMEZONE),
             )
             # Rows arrive ordered earliest-first, so keeping the first few per
             # user yields each buddy's soonest upcoming plans.
@@ -622,6 +704,7 @@ def _plan_dict(r, include_groups=True):
         "country": r.get("country"),
         "planned_date": r["planned_date"].isoformat() if hasattr(r["planned_date"], "isoformat") else r["planned_date"],
         "planned_time": r["planned_time"].strftime("%H:%M") if r.get("planned_time") else None,
+        "planned_timestamp": r["planned_timestamp"].isoformat() if r.get("planned_timestamp") else None,
     }
     if include_groups:
         out["buddy_ids"] = [str(b) for b in (r.get("buddy_ids") or [])]
