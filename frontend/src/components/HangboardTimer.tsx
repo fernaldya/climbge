@@ -7,9 +7,11 @@ import { Play } from "lucide-react";
 
 const MAX_HANG_DURATION_SECONDS = 120;
 
+type HangDuration = number | "";
+
 export function HangboardTimer() {
   const [open, setOpen] = useState(false);
-  const [hangDuration, setHangDuration] = useState(10);
+  const [hangDuration, setHangDuration] = useState<HangDuration>(10);
   const [hangRemaining, setHangRemaining] = useState<number | null>(null);
   const hangIntervalRef = useRef<number | null>(null);
 
@@ -19,7 +21,7 @@ export function HangboardTimer() {
 
   function startHang() {
     if (hangIntervalRef.current) clearInterval(hangIntervalRef.current);
-    const duration = Math.min(MAX_HANG_DURATION_SECONDS, Math.max(1, hangDuration));
+    const duration = clampHangDuration(hangDuration);
     setHangDuration(duration);
     setHangRemaining(duration + 1);
     hangIntervalRef.current = window.setInterval(() => {
@@ -39,6 +41,12 @@ export function HangboardTimer() {
   }
 
   useEffect(() => () => { if (hangIntervalRef.current) clearInterval(hangIntervalRef.current); }, []);
+
+  function clampHangDuration(value: HangDuration) {
+    if (value === "") return 1;
+
+    return Math.min(MAX_HANG_DURATION_SECONDS, Math.max(1, Math.trunc(value)));
+  }
 
   return (
     <>
@@ -74,8 +82,18 @@ export function HangboardTimer() {
                   type="number"
                   min={1}
                   max={MAX_HANG_DURATION_SECONDS}
+                  step={1}
                   value={hangDuration}
-                  onChange={(e) => setHangDuration(Math.min(MAX_HANG_DURATION_SECONDS, Math.max(1, Number(e.target.value))))}
+                  onChange={(e) => {
+                    if (e.target.value === "") {
+                      setHangDuration("");
+                      return;
+                    }
+
+                    const value = Number(e.target.value);
+                    if (Number.isFinite(value)) setHangDuration(clampHangDuration(value));
+                  }}
+                  onBlur={() => setHangDuration((value) => clampHangDuration(value))}
                 />
               </div>
             )}
