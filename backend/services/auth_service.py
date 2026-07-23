@@ -116,12 +116,24 @@ def signup_user(data: dict):
     }
     return {"authenticated": True, "profile": profile}, 201
 
-def login_with_password(username: str, password: str):
+def _record_login_attempt(cur, username: str, user_id, success: bool, user_agent: str | None):
+    cur.execute(
+        """
+        INSERT INTO public.login_attempts
+          (attempted_username, user_id, success, user_agent)
+        VALUES
+          (%s, %s, %s, %s)
+        """,
+        (username, user_id, success, user_agent),
+    )
+
+
+def login_with_password(username: str, password: str, user_agent: str | None = None):
     if not username or not password:
         return err("invalid_request", "Username and password are required."), 400
 
     try:
-        with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
                 SELECT user_id, password
@@ -132,10 +144,20 @@ def login_with_password(username: str, password: str):
                 (username,),
             )
             row = cur.fetchone()
-            if not row or not verify_password(password, row["password"]):
+            if not row:
+                _record_login_attempt(cur, username, None, False, user_agent)
+                return err("invalid_credentials", "Invalid credentials.", 401)
+            if not verify_password(password, row["password"]):
+                _record_login_attempt(cur, username, row["user_id"], False, user_agent)
                 return err("invalid_credentials", "Invalid credentials.", 401)
 
-            profile = fetch_user_profile(row["user_id"])
+            _record_login_attempt(cur, username, row["user_id"], True, user_agent)
+            cur.execute(
+                "UPDATE public.users SET last_login = now() WHERE user_id = %s",
+                (row["user_id"],),
+            )
+
+        profile = fetch_user_profile(row["user_id"])
     except Exception:
         logger.exception("login failed db_error")
         return err("db_error", "Database error.", 500)
