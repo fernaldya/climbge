@@ -25,7 +25,8 @@ def login():
     body = request.get_json(silent=True) or {}
     username = body.get("username", "").strip()
     password = body.get("password", "")
-    return login_with_password(username, password)
+    user_agent = (request.headers.get("User-Agent") or "").strip() or None
+    return login_with_password(username, password, user_agent)
 
 
 @auth_bp.post("/logout")
