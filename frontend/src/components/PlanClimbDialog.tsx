@@ -164,14 +164,14 @@ export function PlanClimbDialog({
             </Select>
           </div>
 
-          <div className="flex gap-3">
-            <div className="space-y-1 flex-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
+            <div className="min-w-0 space-y-1">
               <Label htmlFor="plan-date">Date</Label>
-              <Input id="plan-date" type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input id="plan-date" type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} className="min-w-0 px-2 text-xs" />
             </div>
-            <div className="space-y-1 flex-1">
+            <div className="min-w-0 space-y-1">
               <Label htmlFor="plan-time">Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
-              <Input id="plan-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+              <Input id="plan-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} className="min-w-0 px-2 text-xs" />
             </div>
           </div>
 
