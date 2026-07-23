@@ -5,6 +5,8 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Play } from "lucide-react";
 
+const MAX_HANG_DURATION_SECONDS = 120;
+
 export function HangboardTimer() {
   const [open, setOpen] = useState(false);
   const [hangDuration, setHangDuration] = useState(10);
@@ -17,7 +19,9 @@ export function HangboardTimer() {
 
   function startHang() {
     if (hangIntervalRef.current) clearInterval(hangIntervalRef.current);
-    setHangRemaining(hangDuration + 1);
+    const duration = Math.min(MAX_HANG_DURATION_SECONDS, Math.max(1, hangDuration));
+    setHangDuration(duration);
+    setHangRemaining(duration + 1);
     hangIntervalRef.current = window.setInterval(() => {
       setHangRemaining((r) => {
         if (r === null || r <= 0) {
@@ -69,9 +73,9 @@ export function HangboardTimer() {
                 <Input
                   type="number"
                   min={1}
-                  max={120}
+                  max={MAX_HANG_DURATION_SECONDS}
                   value={hangDuration}
-                  onChange={(e) => setHangDuration(Math.max(1, Number(e.target.value)))}
+                  onChange={(e) => setHangDuration(Math.min(MAX_HANG_DURATION_SECONDS, Math.max(1, Number(e.target.value))))}
                 />
               </div>
             )}
