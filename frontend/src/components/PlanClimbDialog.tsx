@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -42,6 +42,17 @@ function plannedTimestamp(date: string, time: string) {
   return new Date(`${date}T${localTime}`).toISOString();
 }
 
+function openNativePicker(input: HTMLInputElement | null) {
+  if (!input) return;
+
+  input.focus();
+  try {
+    input.showPicker?.();
+  } catch {
+    /* Some browsers restrict showPicker to specific user gestures. */
+  }
+}
+
 /**
  * Create a planned climb: pick a gym (from the climb-locations tree), a required
  * date and optional time, then choose which buddy groups can see it. The last
@@ -68,6 +79,8 @@ export function PlanClimbDialog({
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const timeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -164,14 +177,31 @@ export function PlanClimbDialog({
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2">
             <div className="min-w-0 space-y-1">
               <Label htmlFor="plan-date">Date</Label>
-              <Input id="plan-date" type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} className="min-w-0 text-base sm:test-sm" />
+              <Input
+                ref={dateInputRef}
+                id="plan-date"
+                type="date"
+                min={today}
+                value={date}
+                onClick={() => openNativePicker(dateInputRef.current)}
+                onChange={(e) => setDate(e.target.value)}
+                className="min-w-0 text-base sm:text-sm"
+              />
             </div>
             <div className="min-w-0 space-y-1">
               <Label htmlFor="plan-time">Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
-              <Input id="plan-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} className="min-w-0 text-base sm:test-sm" />
+              <Input
+                ref={timeInputRef}
+                id="plan-time"
+                type="time"
+                value={time}
+                onClick={() => openNativePicker(timeInputRef.current)}
+                onChange={(e) => setTime(e.target.value)}
+                className="min-w-0 text-base sm:text-sm"
+              />
             </div>
           </div>
 
