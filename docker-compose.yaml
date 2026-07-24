@@ -7,16 +7,19 @@ services:
       gunicorn app:app -w 2 -k gthread
       -b 0.0.0.0:${APP_PORT:-9001}
       --forwarded-allow-ips="*" --timeout 60
-    volumes:
-      - /app/.env:/app/.env:ro
-      - /logs/climbge:/logs:rw
-    environment:
-      - ENV_DIR=/app/.env
-    ports:
-      - "9001:9001"
+    env_file:
+      - .env
+    expose:
+      - "9001"
+    networks:
+      - production_shared
     restart: unless-stopped
     healthcheck:
       test: [ "CMD", "curl", "-fsS", "http://127.0.0.1:9001/healthz" ]
       interval: 30s
       timeout: 5s
       retries: 5
+
+networks:
+  production_shared:
+    external: true
