@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { apiFetchClimbLocations, apiCreatePlannedClimb } from "../lib/api";
 import type { ClimbLocations } from "../types/climb";
 import type { BuddySummary } from "../types/buddy";
+import { ChevronDown } from "lucide-react";
 
 const SHARE_KEY = "buddyhub:lastShare";
 
@@ -51,6 +51,43 @@ function openNativePicker(input: HTMLInputElement | null) {
   } catch {
     /* Some browsers restrict showPicker to specific user gestures. */
   }
+}
+
+function NativePickerField({
+  id,
+  type,
+  value,
+  min,
+  placeholder,
+  inputRef,
+  onChange,
+}: {
+  id: string;
+  type: "date" | "time";
+  value: string;
+  min?: string;
+  placeholder: string;
+  inputRef: RefObject<HTMLInputElement>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="group relative h-10 w-full">
+      <input
+        ref={inputRef}
+        id={id}
+        type={type}
+        min={min}
+        value={value}
+        onClick={(e) => openNativePicker(e.currentTarget)}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+      />
+      <div className="flex h-10 w-full items-center justify-between rounded-md border bg-white px-3 text-sm text-black group-focus-within:outline-none group-focus-within:ring-2 group-focus-within:ring-ring group-focus-within:ring-offset-2">
+        <span className={value ? "truncate" : "truncate text-muted-foreground"}>{value || placeholder}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -180,27 +217,25 @@ export function PlanClimbDialog({
           <div className="grid grid-cols-1 gap-2">
             <div className="min-w-0 space-y-1">
               <Label htmlFor="plan-date">Date</Label>
-              <Input
-                ref={dateInputRef}
+              <NativePickerField
                 id="plan-date"
                 type="date"
                 min={today}
                 value={date}
-                onClick={() => openNativePicker(dateInputRef.current)}
-                onChange={(e) => setDate(e.target.value)}
-                className="min-w-0 text-base sm:text-sm"
+                placeholder=""
+                inputRef={dateInputRef}
+                onChange={setDate}
               />
             </div>
             <div className="min-w-0 space-y-1">
               <Label htmlFor="plan-time">Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
-              <Input
-                ref={timeInputRef}
+              <NativePickerField
                 id="plan-time"
                 type="time"
                 value={time}
-                onClick={() => openNativePicker(timeInputRef.current)}
-                onChange={(e) => setTime(e.target.value)}
-                className="min-w-0 text-base sm:text-sm"
+                placeholder=""
+                inputRef={timeInputRef}
+                onChange={setTime}
               />
             </div>
           </div>
