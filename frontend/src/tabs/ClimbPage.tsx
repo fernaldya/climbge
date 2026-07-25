@@ -19,6 +19,8 @@ const LS_KEYS = {
   LOCATION: "climb.location",
 } as const;
 
+const CUSTOM_LOCATION_MAX_LENGTH = 75;
+
 
 // --- Helpers ---------------------------------------------------------------
 function uuid(): string {
@@ -63,6 +65,8 @@ export function ClimbTab() {
   const [locations, setLocations] = useState<ClimbLocations>([]);
   const [location, setLocation] = useState<SelectedLocation | null>(null);
   const [openLoc, setOpenLoc] = useState(false);
+  const [showCustomLocation, setShowCustomLocation] = useState(false);
+  const [customLocation, setCustomLocation] = useState("");
 
   // Grade systems from DB
   const [systems, setSystems] = useState<GradeSystem[]>([]);
@@ -178,7 +182,28 @@ export function ClimbTab() {
     localStorage.setItem(LS_KEYS.LOCATION, JSON.stringify(sel));
     // If a session is already running, keep its captured location in sync.
     setSession((prev) => (prev ? { ...prev, location: sel } : prev));
+    setShowCustomLocation(false);
+    setCustomLocation("");
     setOpenLoc(false);
+  }
+
+  function updateCustomLocation(next: string) {
+    setCustomLocation(next);
+    const gym = next.trim();
+
+    if (!gym) {
+      if (location?.custom) {
+        setLocation(null);
+        localStorage.removeItem(LS_KEYS.LOCATION);
+        setSession((prev) => (prev ? { ...prev, location: undefined } : prev));
+      }
+      return;
+    }
+
+    const sel: SelectedLocation = { country: "", city: "", gym, custom: true };
+    setLocation(sel);
+    localStorage.setItem(LS_KEYS.LOCATION, JSON.stringify(sel));
+    setSession((prev) => (prev ? { ...prev, location: sel } : prev));
   }
 
   function startSession() {
@@ -332,7 +357,7 @@ export function ClimbTab() {
               </div>
               {location && (
                 <div className="text-xs text-muted-foreground truncate">
-                  {location.city}, {location.country}
+                  {location.custom ? "Other" : `${location.city}, ${location.country}`}
                 </div>
               )}
             </div>
@@ -587,6 +612,36 @@ export function ClimbTab() {
               )}
             </ScrollArea>
           </div>
+          <div className="mt-3 space-y-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full justify-start"
+              onClick={() => {
+                setShowCustomLocation(true);
+                setCustomLocation(location?.custom ? location.gym : "");
+              }}
+            >
+              Other
+            </Button>
+            {showCustomLocation && (
+              <div className="space-y-2 rounded-xl border p-3">
+                <Label htmlFor="custom-climb-location" className="text-xs">
+                  Gym location
+                </Label>
+                <Input
+                  id="custom-climb-location"
+                  placeholder="Type gym location"
+                  value={customLocation}
+                  onChange={(e) => updateCustomLocation(e.target.value)}
+                  maxLength={CUSTOM_LOCATION_MAX_LENGTH}
+                />
+                <div className="text-xs text-muted-foreground">
+                  {customLocation.length}/{CUSTOM_LOCATION_MAX_LENGTH}
+                </div>
+              </div>
+            )}
+          </div>
           <DialogFooter>
             {location && (
               <Button
@@ -594,6 +649,9 @@ export function ClimbTab() {
                 onClick={() => {
                   setLocation(null);
                   localStorage.removeItem(LS_KEYS.LOCATION);
+                  setSession((prev) => (prev ? { ...prev, location: undefined } : prev));
+                  setShowCustomLocation(false);
+                  setCustomLocation("");
                   setOpenLoc(false);
                 }}
               >
