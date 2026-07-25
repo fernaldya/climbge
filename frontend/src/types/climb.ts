@@ -64,6 +64,7 @@ export type SelectedLocation = {
   country: string;
   city: string;
   gym: string;
+  custom?: boolean;
 };
 
 export interface LocalRoute {
