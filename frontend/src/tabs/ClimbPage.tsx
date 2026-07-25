@@ -649,6 +649,7 @@ export function ClimbTab() {
                 onClick={() => {
                   setLocation(null);
                   localStorage.removeItem(LS_KEYS.LOCATION);
+                  setSession((prev) => (prev ? { ...prev, location: undefined } : prev));
                   setShowCustomLocation(false);
                   setCustomLocation("");
                   setOpenLoc(false);
