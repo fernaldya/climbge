@@ -112,7 +112,12 @@ def insert_session_routes(cur, *, session_id: str, routes: List[Dict[str, Any]])
         if not grade_label:
             continue
 
-        attempts = max(r.get("attempts"), 1)
+        try:
+            attempts = max(int(r.get("attempts", 0)), 0)
+        except (TypeError, ValueError):
+            attempts = 0
+        if attempts == 0:
+            continue
 
         sent = bool(r.get("sent"))
         sent_raw = r.get('sent_at')
