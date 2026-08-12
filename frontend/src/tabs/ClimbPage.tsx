@@ -503,18 +503,27 @@ export function ClimbTab() {
                     </div>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <Minus
-                          className={`h-5 w-5 ${(r.sent && r.attempts <= 1) || (!r.sent && r.attempts === 0) ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:text-primary'}`}
+                        <button
+                          type="button"
                           onClick={() => incAttempt(r.id, -1)}
-                        />
+                          disabled={(r.sent && r.attempts <= 1) || (!r.sent && r.attempts === 0)}
+                          className={`h-5 w-5 ${(r.sent && r.attempts <= 1) || (!r.sent && r.attempts === 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:text-primary'}`}
+                          aria-label="Decrease attempts"
+                        >
+                          <Minus className="h-5 w-5" />
+                        </button>
                         <div className="text-center min-w-[60px]">
                           <div className="font-bold text-primary">{r.attempts}</div>
                           <div className="text-xs text-muted-foreground">attempts</div>
                         </div>
-                        <Plus
-                          className="h-5 w-5 cursor-pointer hover:text-primary"
+                        <button
+                          type="button"
                           onClick={() => incAttempt(r.id, 1)}
-                        />
+                          className="h-5 w-5 cursor-pointer hover:text-primary"
+                          aria-label="Increase attempts"
+                        >
+                          <Plus className="h-5 w-5" />
+                        </button>
                       </div>
                       <div className="flex flex-col gap-2">
                         <Button
