@@ -29,7 +29,7 @@ def fetch_grades() -> List[Dict[str, Any]]:
             """
             SELECT grade_id, grade_system, grades
             FROM grade_systems
-            WHERE grade_id != 999
+            WHERE grade_id != 999 AND status = 'active'
             ORDER BY grade_id
             """
         )
@@ -80,7 +80,7 @@ def insert_session(
 
 def insert_session_routes(cur, *, session_id: str, routes: List[Dict[str, Any]]) -> None:
     """
-    Insert route rows for a session.
+    Insert route rows for a session using batch inserts.
 
     Each route dict must contain:
       - grade_system: int
@@ -93,6 +93,7 @@ def insert_session_routes(cur, *, session_id: str, routes: List[Dict[str, Any]])
     if not routes:
         return
 
+    # (1) Prepare session_routes
     sql_session_routes = """
         INSERT INTO session_routes (
             session_id, grade_system, grade_label, attempts, sent, sent_at, description
@@ -100,10 +101,8 @@ def insert_session_routes(cur, *, session_id: str, routes: List[Dict[str, Any]])
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
 
-    sql_unknown = """
-        INSERT INTO unknown_grade_systems (grade_id, grade_system, grades)
-        VALUES (%s, %s, %s)
-    """
+    session_routes_data = []
+    unknown_grade_entries = set()
 
     for r in routes:
         gs_id = r.get("grade_system", 999)
@@ -124,19 +123,31 @@ def insert_session_routes(cur, *, session_id: str, routes: List[Dict[str, Any]])
         sent_dt = parse_ts(sent_raw) if sent_raw else None
         description = r.get('description')
 
-        # (1) Always insert into session_routes
-        cur.execute(
-            sql_session_routes,
-            (session_id, gs_id, grade_label, attempts, sent, sent_dt, description),
-        )
+        session_routes_data.append((
+            session_id, gs_id, grade_label, attempts, sent, sent_dt, description
+        ))
 
-        # (2) If “Other”, also log to unknown_grade_systems
+        # (2) Collect unknown grade systems
         if gs_id == UNKNOWN_GRADE_SYSTEM_ID:
             unknown_label = (r.get("grade_system_label") or "Other").strip()
-            cur.execute(
-                sql_unknown,
-                (UNKNOWN_GRADE_SYSTEM_ID, unknown_label, grade_label),
-            )
+            unknown_grade_entries.add((unknown_label, grade_label))
+
+    # Insert session_routes
+    if session_routes_data:
+        cur.executemany(sql_session_routes, session_routes_data)
+
+    # (3) Insert unknown grade systems
+    if unknown_grade_entries:
+        sql_unknown = """
+            INSERT INTO unknown_grade_systems (grade_id, grade_system, grades)
+            VALUES (%s, %s, %s)
+        """
+        unknown_data = [
+            (UNKNOWN_GRADE_SYSTEM_ID, label, grade)
+            for label, grade in unknown_grade_entries
+        ]
+        cur.executemany(sql_unknown, unknown_data)
+
 
 
 def commit_session_service(user_id: str, payload: dict):
