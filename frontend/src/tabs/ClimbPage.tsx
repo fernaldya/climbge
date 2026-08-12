@@ -492,62 +492,63 @@ export function ClimbTab() {
             ) : (
               <div className="space-y-2">
                 {session.routes.map((r) => (
-                  <div key={r.id} className="p-3 rounded-xl bg-muted/50">
-                    <div className="grid grid-cols-5 gap-3 items-center">
-                      <div className="min-w-0">
-                        <div className="text-sm text-wrap">
-                          {renderSystemName(r)} {r.gradeLabel}
-                        </div>
-                        {r.description && (
-                          <div className="text-sm text-muted-foreground mt-0.5 text-wrap">
-                            {r.description}
-                          </div>
-                        )}
+                  <div key={r.id} className="p-4 bg-muted/30 rounded-xl border border-border/50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="secondary" className="bg-primary/10 text-primary">
+                          {r.gradeLabel}
+                        </Badge>
+                        <span className="font-medium text-sm">{renderSystemName(r)}</span>
                       </div>
-
-                      {/* Right: actions */}
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="icon"
-                          variant="secondary"
+                    </div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <Minus
+                          className={`h-5 w-5 ${(r.sent && r.attempts <= 1) || (!r.sent && r.attempts === 0) ? 'opacity-50 cursor-not-allowed pointer-events-none' : 'cursor-pointer hover:text-primary'}`}
                           onClick={() => incAttempt(r.id, -1)}
-                        >
-                          <Minus className="h-4 w-4 ml-3" />
-                        </Button>
-                        <Badge className="min-w-10 justify-center -ml-3">{r.attempts}</Badge>
+                        />
+                        <div className="text-center min-w-[60px]">
+                          <div className="font-bold text-primary">{r.attempts}</div>
+                          <div className="text-xs text-muted-foreground">attempts</div>
+                        </div>
+                        <Plus
+                          className="h-5 w-5 cursor-pointer hover:text-primary"
+                          onClick={() => incAttempt(r.id, 1)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
                         <Button
-                          size="icon"
-                          variant="secondary"
-                          onClick={() => incAttempt(r.id, +1)}
-                        >
-                          <Plus className="h-4 w-4 -ml-3" />
-                        </Button>
-                        <Button
+                          size="sm"
+                          variant="default"
                           onClick={() => toggleSent(r.id)}
-                          className={`gap-2 transition-opacity -ml-3 ${
+                          className={`transition-opacity ${
                             r.sent
-                              ? "opacity-100 bg-green-500 text-white hover:bg-green-600"
+                              ? "bg-green-600 hover:bg-green-700 text-white"
                               : "opacity-40 hover:opacity-60"
                           }`}
-                          variant="default"
                         >
-                          {/* Fixed space for icon */}
-                          <span className="inline-block w-4">
-                            {r.sent && r.attempts === 1 && <Zap className="h-4 w-4 fill-yellow-500 text-yellow-500" />}
-                            {r.sent && r.attempts > 1 && <Check className="h-4 w-4" />}
-                          </span>
-                          Sent
+                          {r.sent && r.attempts === 1 ? (
+                            <Zap className="h-4 w-4 mr-1 fill-yellow-500 text-yellow-500" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                          )}
+                          Sent!
                         </Button>
                         <Button
-                          size="icon"
-                          variant="ghost"
+                          variant="outline"
+                          size="sm"
                           onClick={() => removeRoute(r.id)}
-                          className="-ml-2"
+                          className="text-destructive hover:text-destructive"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          Remove
                         </Button>
                       </div>
                     </div>
+                    {r.description && (
+                      <div className="text-sm text-muted-foreground text-wrap">
+                        {r.description}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
