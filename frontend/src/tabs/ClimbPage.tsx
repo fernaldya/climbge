@@ -8,7 +8,7 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Trash2, Check, Zap, MapPin, ChevronRight } from "lucide-react";
+import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Check, Zap, MapPin, ChevronRight } from "lucide-react";
 import { apiFetchGradeSystems, apiCommitClimbSession, apiFetchClimbLocations } from "../lib/api";
 import type { LocalSession, LocalRoute, GradeSystem, ClimbLocations, SelectedLocation } from "../types/climb";
 
