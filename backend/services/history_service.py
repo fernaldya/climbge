@@ -122,3 +122,60 @@ def fetch_weekly_stats(user_id: str):
     except Exception:
         logger.exception("weekly_stats fetch failed user_id=%s", user_id)
         return {"error": {"code": "db_error", "message": "Could not fetch weekly climb statistics!"}}, 500
+
+
+def fetch_outdoor_climbs(user_id: str):
+    """
+    Fetches the outdoor climbs for a user.
+    Returns two lists of dictionaries of sent and projected climbs.
+    """
+    try:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT user_id, grade_system, grade_label, route_name, description, location, attempts, sent, sent_at::date, climb_date
+                FROM outdoor_climb_history
+                WHERE user_id = %s
+                """,
+                (user_id,)
+            )
+            row = cur.fetchall()
+        if not row:
+            sent_climbs = []
+            projected_climbs = []
+            outdoor_climbs = {'sent': sent_climbs, 'project': projected_climbs}
+            return outdoor_climbs, 200
+
+        outdoor_climbs = {}
+        sent_climbs = [
+            {
+                "user_id": r["user_id"],
+                "gradeSystem": r["grade_system"],
+                "gradeLabel": r["grade_label"],
+                "routeName": r["route_name"],
+                "description": r["description"],
+                "location": r["location"],
+                "attempts": r["attempts"],
+                "sent": r["sent"],
+                "sentAt": r["sent_at"].strftime("%Y-%m-%d"),
+                "climbDate": r["first_climb_date"].strftime("%Y-%m-%d")
+            } for r in row if r["sent"] is not None
+        ]
+        projected_climbs = [
+            {
+                "user_id": r["user_id"],
+                "gradeSystem": r["grade_system"],
+                "gradeLabel": r["grade_label"],
+                "routeName": r["route_name"],
+                "description": r["description"],
+                "location": r["location"],
+                "attempts": r["attempts"],
+                "firstClimbDate": r["first_climb_date"].strftime("%Y-%m-%d")
+            } for r in row if r["sent"] is None
+        ]
+        outdoor_climbs = {'sent': sent_climbs, 'totalSent': len(sent_climbs), 'project': projected_climbs, 'totalProject': len(projected_climbs)}
+        return outdoor_climbs, 200
+
+    except Exception:
+        logger.exception("outdoor_climbs fetch failed user_id=%s", user_id)
+        return {"error": {"code": "db_error", "message": "Could not fetch outdoor climbs!"}}, 500
