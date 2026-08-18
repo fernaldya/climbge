@@ -414,3 +414,57 @@ export function apiCreatePlannedClimb(payload: {
 export function apiCancelPlannedClimb(planId: string) {
   return request<{ ok: boolean }>(`/api/planned-climbs/${planId}`, 'DELETE');
 }
+
+// ===== Outdoor Climbs =====
+export async function apiFetchOutdoorClimbs() {
+  try {
+    const res = await fetch(joinURL('/api/outdoor-climbs'), { credentials: 'include' });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function apiSaveOutdoorClimb(route: any): Promise<{ ok: boolean; route?: any }> {
+  try {
+    const res = await fetch(joinURL('/api/outdoor-climbs'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ route }),
+    });
+    return json<{ ok: boolean; route?: any }>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
+  }
+}
+
+export async function apiUpdateOutdoorClimb(routeId: string, updates: any): Promise<{ ok: boolean }> {
+  try {
+    const res = await fetch(joinURL(`/api/outdoor-climbs/${routeId}`), {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates }),
+    });
+    return json<{ ok: boolean }>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
+  }
+}
+
+export async function apiDeleteOutdoorClimb(routeId: string): Promise<{ ok: boolean }> {
+  try {
+    const res = await fetch(joinURL(`/api/outdoor-climbs/${routeId}`), {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    return json<{ ok: boolean }>(res);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    mapNetworkError(e);
+  }
+}

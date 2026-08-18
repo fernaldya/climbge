@@ -109,6 +109,33 @@ export type CommitSessionResponse =
   | { ok: true; session_id: string }
   | { ok?: false; error: string };
 
+// Outdoor climbing types
+export type OutdoorRouteStatus = 'projecting' | 'sent';
+
+export interface OutdoorRoute {
+  id: string;
+  route_id?: string;
+  user_id?: string;
+  name: string;
+  location: string;
+  gradeSystem: number;
+  gradeSystemLabel?: string;
+  grade: string;
+  description?: string;
+  attempts: number;
+  isSent: boolean;
+  startedAt: string;
+  sentAt?: string;
+  route_seq?: number;
+  is_deleted?: boolean;
+  deleted_at?: string;
+  created_at?: string;
+}
+
+export interface OutdoorSession {
+  routes: OutdoorRoute[];
+}
+
 const OTHER_ID = 999;
 export function toCommitPayload(ls: LocalSession): CommitSessionPayload {
   return {
