@@ -250,3 +250,229 @@ def fetch_climb_locations() -> List[Dict[str, Any]]:
     result = [{k: v} for k, v in grouped.items()]
 
     return result
+
+# ------------ Outdoor ------------------
+def fetch_outdoor_climbs(user_id: str):
+    """
+    Fetches the outdoor climbs for a user.
+    Returns a list of all outdoor climbs (both sent and projecting).
+    """
+    try:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT user_id, route_id, grade_system, grade_label, route_name, description,
+                       location, attempts, sent, sent_at, first_climb_date
+                FROM vw_outdoor_climb
+                WHERE user_id = %s
+                    AND is_deleted IS FALSE
+                ORDER BY first_climb_date DESC, route_seq DESC
+                """,
+                (user_id,)
+            )
+            rows = cur.fetchall()
+
+        outdoor_climbs = [
+            {
+                "user_id": r["user_id"],
+                "route_id": r["route_id"],
+                "grade_system": r["grade_system"],
+                "grade_label": r["grade_label"],
+                "route_name": r["route_name"],
+                "description": r["description"],
+                "location": r["location"],
+                "attempts": r["attempts"],
+                "is_sent": r["sent"],
+                "sent_at": r["sent_at"].strftime("%Y-%m-%d") if r["sent_at"] else None,
+                "first_climb_date": r["first_climb_date"].strftime("%Y-%m-%d"),
+                "route_seq": r["route_seq"]
+            } for r in rows
+        ]
+        return outdoor_climbs, 200
+
+    except Exception:
+        logger.exception("outdoor_climbs fetch failed user_id=%s", user_id)
+        return {"error": {"code": "db_error", "message": "Could not fetch outdoor climbs!"}}, 500
+
+
+def edit_outdoor_climb(user_id: str, route_id: str, is_sent: bool, attempts: int = None,
+                       first_climb_date: str = None, sent_at: str = None):
+    """
+    Edits an outdoor climb route.
+    For active projects (is_sent=False): can edit attempts and first_climb_date
+    For sent routes (is_sent=True): can edit first_climb_date and sent_at only
+    Commits changes immediately to the database.
+
+    Args:
+        user_id: The user's UUID
+        route_id: The route's UUID
+        is_sent: Current sent status of the route
+        attempts: New attempt count (only for active projects)
+        first_climb_date: New start date
+        sent_at: New send date (only for sent routes)
+    """
+    try:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            # Build update query based on what's being edited
+            updates = []
+            params = []
+            param_idx = 1
+
+            if first_climb_date is not None:
+                updates.append("first_climb_date = %s")
+                params.append(first_climb_date)
+                param_idx += 1
+
+            if is_sent:
+                # Sent routes: can only edit first_climb_date and sent_at
+                if sent_at is not None:
+                    updates.append("sent_at = %s")
+                    params.append(sent_at)
+                    param_idx += 1
+            else:
+                # Active projects: can edit attempts and first_climb_date
+                if attempts is not None:
+                    updates.append("attempts = %s")
+                    params.append(attempts)
+                    param_idx += 1
+
+            if not updates:
+                return {"ok": True, "message": "No changes to apply"}, 200
+
+            params.extend([user_id, route_id])
+
+            query = f"""
+                UPDATE outdoor_climbs
+                SET {', '.join(updates)}
+                WHERE user_id = %s AND route_id = %s
+                AND is_deleted IS FALSE
+                RETURNING *
+            """
+
+            cur.execute(query, params)
+            updated_row = cur.fetchone()
+
+            if not updated_row:
+                return {"ok": False, "error": "Route not found or already deleted"}, 404
+
+            conn.commit()
+
+            return {
+                "ok": True,
+                "route": {
+                    "user_id": updated_row["user_id"],
+                    "route_id": updated_row["route_id"],
+                    "grade_system": updated_row["grade_system"],
+                    "grade_label": updated_row["grade_label"],
+                    "route_name": updated_row["route_name"],
+                    "description": updated_row["description"],
+                    "location": updated_row["location"],
+                    "attempts": updated_row["attempts"],
+                    "is_sent": updated_row["sent"],
+                    "sent_at": updated_row["sent_at"].strftime("%Y-%m-%d") if updated_row["sent_at"] else None,
+                    "first_climb_date": updated_row["first_climb_date"].strftime("%Y-%m-%d")
+                }
+            }, 200
+
+    except Exception as e:
+        logger.exception("edit_outdoor_climb failed user_id=%s route_id=%s: %s", user_id, route_id, str(e))
+        return {"ok": False, "error": "Failed to edit outdoor climb"}, 500
+
+
+def delete_outdoor_climb(user_id: str, route_id: str):
+    """
+    Soft deletes an outdoor climb route by setting is_deleted to True.
+    Uses the primary key (user_id, route_id) to identify the route.
+    Does NOT actually delete from the database.
+
+    Args:
+        user_id: The user's UUID
+        route_id: The route's UUID
+    """
+    try:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                UPDATE outdoor_climbs
+                SET is_deleted = TRUE, deleted_at = NOW()
+                WHERE user_id = %s AND route_id = %s
+                AND is_deleted IS FALSE
+                RETURNING *
+                """,
+                (user_id, route_id)
+            )
+
+            deleted_row = cur.fetchone()
+
+            if not deleted_row:
+                return {"ok": False, "error": "Route not found or already deleted"}, 404
+
+            conn.commit()
+
+            return {
+                "ok": True,
+                "message": "Route marked as deleted",
+                "route_id": route_id
+            }, 200
+
+    except Exception as e:
+        logger.exception("delete_outdoor_climb failed user_id=%s route_id=%s: %s", user_id, route_id, str(e))
+        return {"ok": False, "error": "Failed to delete outdoor climb"}, 500
+
+
+def create_outdoor_climb(user_id: str, route_name: str, location: str, grade_system: int,
+                         grade_label: str, description: str = None, attempts: int = 0,
+                         sent: bool = False, sent_at: str = None, first_climb_date: str = None):
+    """
+    Creates a new outdoor climb route in the database.
+
+    Args:
+        user_id: The user's UUID
+        route_name: Name of the route
+        location: Location of the route
+        grade_system: Grade system ID
+        grade_label: Grade label (e.g., "5.12d")
+        description: Optional description
+        attempts: Number of attempts (default 0)
+        sent: Whether the route has been sent (default False)
+        sent_at: Date when route was sent (YYYY-MM-DD format)
+        first_climb_date: First climb date (YYYY-MM-DD format)
+    """
+    try:
+        with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                INSERT INTO outdoor_climbs (user_id, route_id, grade_system, grade_label, route_name, description, location, attempts, sent, sent_at, first_climb_date)
+                VALUES (%s, gen_random_uuid(), %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING *
+                """,
+                (user_id, grade_system, grade_label, route_name, description, location, attempts, sent, sent_at, first_climb_date)
+            )
+
+            new_row = cur.fetchone()
+
+            if not new_row:
+                return {"ok": False, "error": "Failed to create route"}, 500
+
+            conn.commit()
+
+            return {
+                "ok": True,
+                "route": {
+                    "user_id": new_row["user_id"],
+                    "route_id": new_row["route_id"],
+                    "grade_system": new_row["grade_system"],
+                    "grade_label": new_row["grade_label"],
+                    "route_name": new_row["route_name"],
+                    "description": new_row["description"],
+                    "location": new_row["location"],
+                    "attempts": new_row["attempts"],
+                    "is_sent": new_row["sent"],
+                    "sent_at": new_row["sent_at"].strftime("%Y-%m-%d") if new_row["sent_at"] else None,
+                    "first_climb_date": new_row["first_climb_date"].strftime("%Y-%m-%d")
+                }
+            }, 201
+
+    except Exception as e:
+        logger.exception("create_outdoor_climb failed user_id=%s: %s", user_id, str(e))
+        return {"ok": False, "error": "Failed to create outdoor climb"}, 500
