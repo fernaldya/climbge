@@ -19,4 +19,5 @@ def logout_user():
     session.pop(SESSION_KEY, None)
 
 def current_user_id():
-    return session[SESSION_KEY]
+    """The logged-in user's id, or None. Callers behind @login_required always get an id."""
+    return session.get(SESSION_KEY)
