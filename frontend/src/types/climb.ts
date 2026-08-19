@@ -25,7 +25,8 @@ export type HistoricalClimb = {
 export type GradeSystem = {
   gradeId: number;
   gradeSystem: string;
-  grades: string;
+  /** /api/grades returns this as a JSON array, not a comma-separated string. */
+  grades: string[];
 }
 
 // Approval queue items mirror the backend view columns (snake_case).
@@ -134,6 +135,85 @@ export interface OutdoorRoute {
 
 export interface OutdoorSession {
   routes: OutdoorRoute[];
+}
+
+// Shape returned by GET/POST/PUT /api/outdoor-climbs (snake_case, straight from the view).
+export interface OutdoorClimbRow {
+  user_id: string;
+  route_id: string;
+  grade_system: number;
+  grade_label: string;
+  route_name: string;
+  description: string | null;
+  location: string;
+  attempts: number;
+  is_sent: boolean;
+  sent_at: string | null;
+  first_climb_date: string | null;
+  route_seq?: number;
+}
+
+// Body accepted by POST /api/outdoor-climbs.
+export type OutdoorCreatePayload = {
+  route_name: string;
+  location: string;
+  grade_system: number;
+  grade_system_label?: string;
+  grade_label: string;
+  description?: string;
+  attempts: number;
+  sent: boolean;
+  sent_at?: string;
+  first_climb_date: string;
+};
+
+// One entry in the PUT /api/outdoor-climbs batch. Omitted keys are left untouched.
+export type OutdoorUpdatePayload = {
+  route_id: string;
+  attempts?: number;
+  sent?: boolean;
+  sent_at?: string;
+  first_climb_date?: string;
+};
+
+/**
+ * The server has nowhere to store the label of a user-supplied ("Other", id 999) grade
+ * system, so we remember it client-side keyed by route_id. See gradeSystemLabel below.
+ */
+export type OutdoorLabelCache = Record<string, string>;
+
+export function fromOutdoorRow(row: OutdoorClimbRow, labels: OutdoorLabelCache = {}): OutdoorRoute {
+  return {
+    id: row.route_id,
+    route_id: row.route_id,
+    user_id: row.user_id,
+    name: row.route_name,
+    location: row.location,
+    gradeSystem: row.grade_system,
+    gradeSystemLabel: labels[row.route_id],
+    grade: row.grade_label,
+    description: row.description ?? undefined,
+    attempts: row.attempts,
+    isSent: row.is_sent,
+    startedAt: row.first_climb_date ?? '',
+    sentAt: row.sent_at ?? undefined,
+    route_seq: row.route_seq,
+  };
+}
+
+export function toOutdoorCreatePayload(r: OutdoorRoute): OutdoorCreatePayload {
+  return {
+    route_name: r.name,
+    location: r.location,
+    grade_system: r.gradeSystem,
+    grade_system_label: r.gradeSystem === OTHER_ID ? (r.gradeSystemLabel || 'Other') : undefined,
+    grade_label: r.grade,
+    description: r.description,
+    attempts: r.attempts,
+    sent: r.isSent,
+    sent_at: r.sentAt,
+    first_climb_date: r.startedAt,
+  };
 }
 
 const OTHER_ID = 999;

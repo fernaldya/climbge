@@ -9,23 +9,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSe
 import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Check, Zap, MapPin, ChevronRight, Trees, Search as SearchIcon, X, Calendar } from "lucide-react";
-import { apiFetchGradeSystems, apiCommitClimbSession, apiFetchClimbLocations, apiFetchOutdoorClimbs, apiSaveOutdoorClimb, apiUpdateOutdoorClimb, apiDeleteOutdoorClimb } from "../lib/api";
-import type { LocalSession, LocalRoute, GradeSystem, ClimbLocations, SelectedLocation, OutdoorRoute } from "../types/climb";
+import { apiFetchGradeSystems, apiCommitClimbSession, apiFetchClimbLocations, apiFetchOutdoorClimbs, apiSaveOutdoorClimbs, apiUpdateOutdoorClimbs, apiDeleteOutdoorClimb } from "../lib/api";
+import type { LocalSession, LocalRoute, GradeSystem, ClimbLocations, SelectedLocation, OutdoorRoute, OutdoorLabelCache, OutdoorUpdatePayload } from "../types/climb";
+import { fromOutdoorRow, toOutdoorCreatePayload } from "../types/climb";
 
 // --- Config / constants ----------------------------------------------------
 const LS_KEYS = {
   CURRENT: "climb.currentSession",
   DEFAULT_GS: "climb.defaultGradeSystem",
+  DEFAULT_OUTDOOR_GS: "climb.defaultOutdoorGradeSystem",
   LOCATION: "climb.location",
-  OUTDOOR_SESSION: "climb.outdoorSession",
-  OUTDOOR_CONFIRMED: "climb.outdoorConfirmed",
 } as const;
 
 const CUSTOM_LOCATION_MAX_LENGTH = 75;
+const OTHER_GRADE_SYSTEM_ID = 999;
+
 const OUTDOOR_STORAGE_KEYS = {
+  /** Routes added this session that have not been saved to the server yet. */
   SESSION: "climb.outdoorSession",
-  CONFIRMED: "climb.outdoorConfirmed",
+  /** Last known server state, so the list paints before the fetch resolves. */
+  CACHE: "climb.outdoorCache",
+  /** Edits to server-side routes awaiting a "Confirm & Save". */
+  PENDING: "climb.outdoorPendingEdits",
+  /** route_id -> custom grade system name; the server has nowhere to keep it. */
+  LABELS: "climb.outdoorLabels",
 } as const;
+
+/** Pre-DB storage key; cleared on load so old local rows don't show up as phantoms. */
+const LEGACY_OUTDOOR_CONFIRMED = "climb.outdoorConfirmed";
+
+/** The subset of an outdoor route the user can change after it has been saved. */
+type OutdoorEdit = Partial<Pick<OutdoorRoute, "attempts" | "isSent" | "sentAt" | "startedAt">>;
+type PendingEdits = Record<string, OutdoorEdit>;
 
 
 // --- Helpers ---------------------------------------------------------------
@@ -33,6 +48,14 @@ function uuid(): string {
   return crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+/** Today as YYYY-MM-DD in the user's own timezone (toISOString would give the UTC day). */
+function todayLocal(): string {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 function saveSession(ls: LocalSession | null) {
@@ -50,42 +73,370 @@ function loadSession(): LocalSession | null {
 }
 
 // --- Outdoor helpers ----------------------------------------------------------
-function loadOutdoorSession(): OutdoorRoute[] {
-  const raw = localStorage.getItem(OUTDOOR_STORAGE_KEYS.SESSION);
-  if (!raw) return [];
+function readStored<T>(key: string, fallback: T): T {
+  const raw = localStorage.getItem(key);
+  if (!raw) return fallback;
   try {
-    return JSON.parse(raw) as OutdoorRoute[];
+    return JSON.parse(raw) as T;
   } catch {
-    return [];
+    return fallback;
   }
 }
 
-function saveOutdoorSession(routes: OutdoorRoute[]) {
-  localStorage.setItem(OUTDOOR_STORAGE_KEYS.SESSION, JSON.stringify(routes));
+function writeStored(key: string, value: unknown) {
+  localStorage.setItem(key, JSON.stringify(value));
 }
 
-function loadOutdoorConfirmed(): OutdoorRoute[] {
-  const raw = localStorage.getItem(OUTDOOR_STORAGE_KEYS.CONFIRMED);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw) as OutdoorRoute[];
-  } catch {
-    return [];
-  }
-}
-
-function saveOutdoorConfirmed(routes: OutdoorRoute[]) {
-  localStorage.setItem(OUTDOOR_STORAGE_KEYS.CONFIRMED, JSON.stringify(routes));
-}
-
+/** Dates round-trip as plain YYYY-MM-DD, so only trim anything longer. */
 function toDateInput(dateStr: string | undefined): string {
-  if (!dateStr) return "";
-  try {
-    const d = new Date(dateStr);
-    return d.toISOString().split("T")[0];
-  } catch {
-    return "";
-  }
+  return dateStr ? dateStr.slice(0, 10) : "";
+}
+
+function filterOutdoorRoutes(routes: OutdoorRoute[], searchQuery: string): OutdoorRoute[] {
+  if (!searchQuery.trim()) return routes;
+  const query = searchQuery.toLowerCase();
+  return routes.filter((r) =>
+    r.name.toLowerCase().includes(query) ||
+    r.location.toLowerCase().includes(query) ||
+    r.grade.toLowerCase().includes(query) ||
+    (r.description?.toLowerCase().includes(query) ?? false)
+  );
+}
+
+/** A sent route always has at least one attempt; an unsent one can go down to zero. */
+function attemptsFloor(isSent: boolean): number {
+  return isSent ? 1 : 0;
+}
+
+function toUpdatePayload(routeId: string, edit: OutdoorEdit): OutdoorUpdatePayload {
+  return {
+    route_id: routeId,
+    attempts: edit.attempts,
+    sent: edit.isSent,
+    sent_at: edit.sentAt,
+    first_climb_date: edit.startedAt,
+  };
+}
+
+// --- Outdoor sub-components ---------------------------------------------------
+// Declared at module scope: nesting them inside ClimbTab makes React see a brand new
+// component type on every render, remounting the whole subtree (and dropping focus in
+// the search box) on each keystroke.
+
+interface OutdoorRouteCardProps {
+  route: OutdoorRoute;
+  /** True while the route only exists in localStorage, before Confirm & Save. */
+  isSessionRoute: boolean;
+  isDirty: boolean;
+  /** The send status has an unconfirmed change; shows a "Pending" badge. */
+  isPendingSendChange: boolean;
+  renderSystemName: (r: OutdoorRoute) => string;
+  onAttempts: (id: string, delta: number) => void;
+  onToggleSent: (id: string) => void;
+  onRequestDelete: (id: string) => void;
+}
+
+function OutdoorRouteCard({
+  route,
+  isSessionRoute,
+  isDirty,
+  isPendingSendChange,
+  renderSystemName,
+  onAttempts,
+  onToggleSent,
+  onRequestDelete,
+}: OutdoorRouteCardProps) {
+  const atFloor = route.attempts <= attemptsFloor(route.isSent);
+
+  return (
+    <div className={`p-4 bg-muted/30 rounded-xl border ${isDirty ? 'border-orange-400 ring-1 ring-orange-200' : 'border-border/50'}`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              {route.grade}
+            </Badge>
+            <span className="font-medium text-sm">{renderSystemName(route)}</span>
+            {isSessionRoute && (
+              <Badge variant="outline" className="text-xs">Unsaved</Badge>
+            )}
+            {isPendingSendChange && (
+              <Badge variant="outline" className="text-xs text-orange-500 border-orange-500">
+                Pending
+              </Badge>
+            )}
+          </div>
+          <h3 className="font-semibold mt-2 text-lg">{route.name}</h3>
+          {route.location && (
+            <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+              <MapPin className="h-3 w-3" />
+              <span>{route.location}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap mt-2">
+          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-xs">Started: {toDateInput(route.startedAt) || 'N/A'}</span>
+        </div>
+        {route.isSent && route.sentAt && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <CheckCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-xs text-green-600">Sent: {toDateInput(route.sentAt)}</span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => onAttempts(route.id, -1)}
+              disabled={atFloor}
+              className={`h-5 w-5 ${atFloor ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:text-primary'}`}
+              aria-label="Decrease attempts"
+            >
+              <Minus className="h-3 w-3" />
+            </button>
+            <div className="text-center min-w-[52px]">
+              <div className={`font-bold ${route.isSent ? 'text-green-700' : 'text-primary'}`}>{route.attempts}</div>
+              <div className="text-xs text-muted-foreground">attempts</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onAttempts(route.id, 1)}
+              className="h-5 w-5 cursor-pointer hover:text-primary"
+              aria-label="Increase attempts"
+            >
+              <Plus className="h-3 w-3" />
+            </button>
+          </div>
+          <div className="flex flex-col gap-1.5 items-end">
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => onToggleSent(route.id)}
+              className={
+                route.isSent
+                  ? "bg-green-600 hover:bg-green-700 text-white"
+                  : "opacity-40 hover:opacity-60"
+              }
+              title={route.isSent ? "Tap to mark as not sent" : "Tap to mark as sent"}
+            >
+              {route.isSent && route.attempts === 1 ? (
+                <Zap className="h-4 w-4 mr-1 fill-yellow-500 text-yellow-500" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-1" />
+              )}
+              Sent!
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onRequestDelete(route.id)}
+              className="text-destructive hover:text-destructive text-xs h-6 px-2"
+            >
+              Remove
+            </Button>
+          </div>
+        </div>
+
+        {route.description && (
+          <div className="text-sm text-muted-foreground text-wrap pt-2 border-t border-border/30">
+            {route.description}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface ProjectingTabProps {
+  /** Unsaved routes from this session (localStorage only). */
+  sessionRoutes: OutdoorRoute[];
+  /** Saved-but-unsent routes (the DB copy, with any pending edits applied). */
+  activeRoutes: OutdoorRoute[];
+  outdoorSearch: string;
+  busy: boolean;
+  activePendingCount: number;
+  isDirty: (id: string) => boolean;
+  isPendingSendChange: (id: string) => boolean;
+  renderSystemName: (r: OutdoorRoute) => string;
+  onAttempts: (id: string, delta: number) => void;
+  onToggleSent: (id: string) => void;
+  onRequestDelete: (id: string) => void;
+  onAddClick: () => void;
+  onConfirmSession: () => void;
+  onSaveActive: () => void;
+}
+
+function ProjectingTab({
+  sessionRoutes,
+  activeRoutes,
+  outdoorSearch,
+  busy,
+  activePendingCount,
+  isDirty,
+  isPendingSendChange,
+  renderSystemName,
+  onAttempts,
+  onToggleSent,
+  onRequestDelete,
+  onAddClick,
+  onConfirmSession,
+  onSaveActive,
+}: ProjectingTabProps) {
+  const filteredSession = filterOutdoorRoutes(sessionRoutes, outdoorSearch);
+  const filteredActive = filterOutdoorRoutes(activeRoutes, outdoorSearch);
+
+  return (
+    <div className="space-y-5">
+      {/* Current Session — lives in localStorage until Confirm & Save */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Current Session</span>
+          <span className="text-xs text-muted-foreground">{sessionRoutes.length} route{sessionRoutes.length !== 1 ? 's' : ''}</span>
+        </div>
+        {filteredSession.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-3">
+            {outdoorSearch ? 'No matches.' : 'No routes added yet.'}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {filteredSession.map((route) => (
+              <OutdoorRouteCard
+                key={route.id}
+                route={route}
+                isSessionRoute
+                isDirty={false}
+                isPendingSendChange={false}
+                renderSystemName={renderSystemName}
+                onAttempts={onAttempts}
+                onToggleSent={onToggleSent}
+                onRequestDelete={onRequestDelete}
+              />
+            ))}
+          </div>
+        )}
+        <Button onClick={onAddClick} variant="outline" className="w-full mt-3">
+          <Plus className="h-4 w-4 mr-2" />Add Project
+        </Button>
+        {sessionRoutes.length > 0 && (
+          <Button onClick={onConfirmSession} disabled={busy} className="w-full mt-2 bg-primary hover:bg-primary/90">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            {busy
+              ? 'Saving…'
+              : `Confirm & Save (${sessionRoutes.length} route${sessionRoutes.length !== 1 ? 's' : ''})`}
+          </Button>
+        )}
+      </div>
+
+      {/* Active Project — already saved to the server, not sent yet */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Project</span>
+          <span className="text-xs text-muted-foreground">{activeRoutes.length} route{activeRoutes.length !== 1 ? 's' : ''}</span>
+        </div>
+        {filteredActive.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-3">
+            {outdoorSearch ? 'No matches.' : 'Nothing saved yet — confirm a session route to start a project.'}
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {filteredActive.map((r) => (
+              <OutdoorRouteCard
+                key={r.id}
+                route={r}
+                isSessionRoute={false}
+                isDirty={isDirty(r.id)}
+                isPendingSendChange={isPendingSendChange(r.id)}
+                renderSystemName={renderSystemName}
+                onAttempts={onAttempts}
+                onToggleSent={onToggleSent}
+                onRequestDelete={onRequestDelete}
+              />
+            ))}
+          </div>
+        )}
+        {activePendingCount > 0 && (
+          <Button
+            onClick={onSaveActive}
+            disabled={busy}
+            className="w-full mt-2 bg-orange-500 hover:bg-orange-600 text-white"
+          >
+            {busy ? 'Saving…' : `Confirm & Save (${activePendingCount} change${activePendingCount !== 1 ? 's' : ''})`}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface SentTabProps {
+  sentRoutes: OutdoorRoute[];
+  outdoorSearch: string;
+  busy: boolean;
+  pendingCount: number;
+  isDirty: (id: string) => boolean;
+  isPendingSendChange: (id: string) => boolean;
+  renderSystemName: (r: OutdoorRoute) => string;
+  onAttempts: (id: string, delta: number) => void;
+  onToggleSent: (id: string) => void;
+  onRequestDelete: (id: string) => void;
+  onSave: () => void;
+}
+
+function SentTab({
+  sentRoutes,
+  outdoorSearch,
+  busy,
+  pendingCount,
+  isDirty,
+  isPendingSendChange,
+  renderSystemName,
+  onAttempts,
+  onToggleSent,
+  onRequestDelete,
+  onSave,
+}: SentTabProps) {
+  const filteredRoutes = filterOutdoorRoutes(sentRoutes, outdoorSearch);
+
+  return (
+    <div className="space-y-3">
+      {pendingCount > 0 && (
+        <Button
+          onClick={onSave}
+          disabled={busy}
+          className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+        >
+          {busy ? 'Saving…' : `Confirm & Save (${pendingCount} change${pendingCount !== 1 ? 's' : ''})`}
+        </Button>
+      )}
+
+      {filteredRoutes.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          {outdoorSearch ? 'No matches.' : 'No sent routes yet. Send your first outdoor climb!'}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {filteredRoutes.map((r) => (
+            <OutdoorRouteCard
+              key={r.id}
+              route={r}
+              isSessionRoute={false}
+              isDirty={isDirty(r.id)}
+              isPendingSendChange={isPendingSendChange(r.id)}
+              renderSystemName={renderSystemName}
+              onAttempts={onAttempts}
+              onToggleSent={onToggleSent}
+              onRequestDelete={onRequestDelete}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // --- Component -------------------------------------------------------------
@@ -121,6 +472,14 @@ export function ClimbTab() {
     return m;
   }, [systems]);
 
+  // Outdoor grade systems
+  const [outdoorSystems, setOutdoorSystems] = useState<GradeSystem[]>([]);
+  const outdoorById = useMemo(() => {
+    const m = new Map<number, GradeSystem>();
+    outdoorSystems.forEach(s => m.set(s.gradeId, s));
+    return m;
+  }, [outdoorSystems]);
+
 
   // Add Route dialog state
   const [openAdd, setOpenAdd] = useState(false);
@@ -137,15 +496,9 @@ export function ClimbTab() {
 
   // helper to render system name for outdoor routes
   const renderOutdoorSystemName = (r: OutdoorRoute) =>
-    r.gradeSystem === 999
+    r.gradeSystem === OTHER_GRADE_SYSTEM_ID
       ? (r.gradeSystemLabel || "Other")
-      : (r.gradeSystem ? (byId.get(r.gradeSystem)?.gradeSystem ?? `System ${r.gradeSystem}`) : "System");
-
-  // Helper to get available grades for a grade system
-  const getAvailableGrades = (gradeSystemId: number | null): string[] => {
-    if (gradeSystemId === null || gradeSystemId === 999) return [];
-    return byId.get(gradeSystemId)?.grades?.split(",") ?? [];
-  };
+      : (r.gradeSystem ? (outdoorById.get(r.gradeSystem)?.gradeSystem ?? `System ${r.gradeSystem}`) : "System");
 
   // End Session dialog
   const [openEnd, setOpenEnd] = useState(false);
@@ -153,20 +506,28 @@ export function ClimbTab() {
   const [commitError, setCommitError] = useState<string | null>(null);
 
   // --- Outdoor state --------------------------------------------------------
-  // Session routes (not yet confirmed)
-  const [sessionRoutes, setSessionRoutes] = useState<OutdoorRoute[]>([]);
-  // Confirmed routes (saved)
-  const [confirmedRoutes, setConfirmedRoutes] = useState<OutdoorRoute[]>([]);
+  // Routes added this session; localStorage only until "Confirm & Save" posts them.
+  const [sessionRoutes, setSessionRoutes] = useState<OutdoorRoute[]>(
+    () => readStored<OutdoorRoute[]>(OUTDOOR_STORAGE_KEYS.SESSION, [])
+  );
+  // Server-side routes. Seeded from the cache so the list paints before the fetch lands.
+  const [dbRoutes, setDbRoutes] = useState<OutdoorRoute[]>(
+    () => readStored<OutdoorRoute[]>(OUTDOOR_STORAGE_KEYS.CACHE, [])
+  );
+  // Edits to server-side routes awaiting confirmation, keyed by route id.
+  const [pendingEdits, setPendingEdits] = useState<PendingEdits>(
+    () => readStored<PendingEdits>(OUTDOOR_STORAGE_KEYS.PENDING, {})
+  );
   // UI state
   const [outdoorTab, setOutdoorTab] = useState<"projecting" | "sent">("projecting");
   const [outdoorSearch, setOutdoorSearch] = useState("");
-  // Track pending sends and dirty edits for confirmed routes
-  const [activePendingSentIds, setActivePendingSentIds] = useState<string[]>([]);
-  const [dirtyConfirmedIds, setDirtyConfirmedIds] = useState<string[]>([]);
+  const [outdoorBusy, setOutdoorBusy] = useState(false);
+  const [outdoorError, setOutdoorError] = useState<string | null>(null);
   // Delete confirmation
   const [outdoorDeleteConfirmId, setOutdoorDeleteConfirmId] = useState<string | null>(null);
   // Add route dialog
   const [isAddOutdoorDialogOpen, setIsAddOutdoorDialogOpen] = useState(false);
+
   const [newOutdoorName, setNewOutdoorName] = useState("");
   const [newOutdoorLocation, setNewOutdoorLocation] = useState("");
   const [newOutdoorGradeSystem, setNewOutdoorGradeSystem] = useState<number | null>(null);
@@ -174,6 +535,7 @@ export function ClimbTab() {
   const [newOutdoorCustomGs, setNewOutdoorCustomGs] = useState("");
   const [newOutdoorDescription, setNewOutdoorDescription] = useState("");
   const [newOutdoorStartedAt, setNewOutdoorStartedAt] = useState("");
+  const [newOutdoorSentAt, setNewOutdoorSentAt] = useState("");
 
   // Mount: load session + systems + locations
   useEffect(() => {
@@ -196,6 +558,14 @@ export function ClimbTab() {
     (async () => {
       try {
         setSystems(await apiFetchGradeSystems());
+      } catch {
+        /* ignore */
+      }
+    })();
+    // Fetched on mount, not on dialog open: the route cards need these names to render.
+    (async () => {
+      try {
+        setOutdoorSystems(await apiFetchGradeSystems(true));
       } catch {
         /* ignore */
       }
@@ -407,58 +777,133 @@ export function ClimbTab() {
   }
 
   // --- Outdoor Actions --------------------------------------------------------
-  // Load outdoor data on mount
+  // What the user sees: the server copy with any unconfirmed edits laid over the top.
+  const effectiveRoutes = useMemo(
+    () => dbRoutes.map((r) => ({ ...r, ...pendingEdits[r.id] })),
+    [dbRoutes, pendingEdits]
+  );
+  // Which tab a route belongs to is decided by the *server* status, not the pending one:
+  // marking an active project as sent leaves it in Active Project (badged "Pending") and it
+  // only moves across once "Confirm & Save" has persisted the change.
+  const activeRoutes = useMemo(
+    () => dbRoutes.filter((r) => !r.isSent).map((r) => ({ ...r, ...pendingEdits[r.id] })),
+    [dbRoutes, pendingEdits]
+  );
+  const sentRoutes = useMemo(
+    () => dbRoutes.filter((r) => r.isSent).map((r) => ({ ...r, ...pendingEdits[r.id] })),
+    [dbRoutes, pendingEdits]
+  );
+
+  const isDirty = (id: string) => Boolean(pendingEdits[id]);
+  /** The send status has an unconfirmed change, in either direction. */
+  const isPendingSendChange = (id: string) => pendingEdits[id]?.isSent !== undefined;
+  const activePendingIds = useMemo(
+    () => activeRoutes.filter((r) => pendingEdits[r.id]).map((r) => r.id),
+    [activeRoutes, pendingEdits]
+  );
+  const sentPendingIds = useMemo(
+    () => sentRoutes.filter((r) => pendingEdits[r.id]).map((r) => r.id),
+    [sentRoutes, pendingEdits]
+  );
+
+  // Pull the server list and refresh the cache. Leaves the cache alone if the request
+  // fails, so a flaky connection never looks like "all your routes disappeared".
+  async function refreshOutdoor() {
+    const rows = await apiFetchOutdoorClimbs();
+    if (!rows) {
+      setOutdoorError("Couldn't reach the server — showing your last saved copy.");
+      return false;
+    }
+    setOutdoorError(null);
+    const labels = readStored<OutdoorLabelCache>(OUTDOOR_STORAGE_KEYS.LABELS, {});
+    const mapped = rows.map((row) => fromOutdoorRow(row, labels));
+    setDbRoutes(mapped);
+    writeStored(OUTDOOR_STORAGE_KEYS.CACHE, mapped);
+    // Drop edits for routes that no longer exist server-side.
+    const live = new Set(mapped.map((r) => r.id));
+    setPendingEdits((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([id]) => live.has(id)))
+    );
+    return true;
+  }
+
   useEffect(() => {
-    setSessionRoutes(loadOutdoorSession());
-    setConfirmedRoutes(loadOutdoorConfirmed());
+    localStorage.removeItem(LEGACY_OUTDOOR_CONFIRMED);
+    refreshOutdoor();
   }, []);
 
-  // Save session routes whenever they change
   useEffect(() => {
-    saveOutdoorSession(sessionRoutes);
+    writeStored(OUTDOOR_STORAGE_KEYS.SESSION, sessionRoutes);
   }, [sessionRoutes]);
 
-  // Save confirmed routes whenever they change
   useEffect(() => {
-    saveOutdoorConfirmed(confirmedRoutes);
-  }, [confirmedRoutes]);
+    writeStored(OUTDOOR_STORAGE_KEYS.PENDING, pendingEdits);
+  }, [pendingEdits]);
 
-  function markConfirmedDirty(id: string) {
-    setDirtyConfirmedIds((prev) => {
-      if (prev.includes(id)) return prev;
-      return [...prev, id];
-    });
-  }
-
-  function toggleActivePendingSentIds(id: string) {
-    setActivePendingSentIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
+  // Merge a change into the pending map, dropping fields that match the server value
+  // again so a route stops showing as dirty once it's been edited back.
+  function setPendingEdit(id: string, patch: OutdoorEdit) {
+    setPendingEdits((prev) => {
+      const base = dbRoutes.find((r) => r.id === id);
+      const merged: OutdoorEdit = { ...prev[id], ...patch };
+      if (base) {
+        (Object.keys(merged) as (keyof OutdoorEdit)[]).forEach((k) => {
+          if (merged[k] === base[k]) delete merged[k];
+        });
       }
-      return Array.from(newSet);
+      const next = { ...prev };
+      if (Object.keys(merged).length === 0) delete next[id];
+      else next[id] = merged;
+      return next;
     });
   }
+
+  function openAddOutdoorDialog() {
+    const saved = localStorage.getItem(LS_KEYS.DEFAULT_OUTDOOR_GS);
+    const lastId = saved ? Number(saved) : (outdoorSystems[0]?.gradeId ?? OTHER_GRADE_SYSTEM_ID);
+    setNewOutdoorGradeSystem(lastId);
+    setNewOutdoorGrade(outdoorById.get(lastId)?.grades?.[0] ?? "");
+    setNewOutdoorCustomGs("");
+    setNewOutdoorName("");
+    setNewOutdoorLocation("");
+    setNewOutdoorDescription("");
+    setNewOutdoorStartedAt(todayLocal());
+    setNewOutdoorSentAt("");
+    setIsAddOutdoorDialogOpen(true);
+  }
+
+  // The sent date is optional, but a route can't be sent before it was first tried.
+  const sentBeforeStart = Boolean(
+    newOutdoorSentAt && newOutdoorStartedAt && newOutdoorSentAt < newOutdoorStartedAt
+  );
+  const canAddOutdoorRoute =
+    Boolean(newOutdoorName.trim()) &&
+    Boolean(newOutdoorLocation.trim()) &&
+    Boolean(newOutdoorGrade.trim()) &&
+    !(newOutdoorGradeSystem === OTHER_GRADE_SYSTEM_ID && !newOutdoorCustomGs.trim()) &&
+    !sentBeforeStart;
 
   function addOutdoorRoute() {
-    if (!newOutdoorName.trim() || !newOutdoorLocation.trim() || !newOutdoorGrade.trim() || (newOutdoorGradeSystem === 999 && !newOutdoorCustomGs.trim())) return;
+    if (!canAddOutdoorRoute) return;
 
-    const isOther = newOutdoorGradeSystem === 999;
+    const isOther = newOutdoorGradeSystem === OTHER_GRADE_SYSTEM_ID;
+    const startedAt = newOutdoorStartedAt || todayLocal();
+    // A sent date means the route was already climbed: show it as sent with one attempt
+    // so the user only has to bump the count up to however many it actually took.
+    const sentAt = newOutdoorSentAt || undefined;
 
     const route: OutdoorRoute = {
       id: uuid(),
       name: newOutdoorName.trim(),
       location: newOutdoorLocation.trim(),
-      gradeSystem: newOutdoorGradeSystem ?? 999,
+      gradeSystem: newOutdoorGradeSystem ?? OTHER_GRADE_SYSTEM_ID,
       gradeSystemLabel: isOther ? newOutdoorCustomGs.trim() : undefined,
       grade: newOutdoorGrade,
       description: newOutdoorDescription.trim() || undefined,
-      attempts: 0,
-      isSent: false,
-      startedAt: newOutdoorStartedAt || new Date().toISOString().split("T")[0],
-      sentAt: undefined,
+      attempts: sentAt ? 1 : 0,
+      isSent: Boolean(sentAt),
+      startedAt,
+      sentAt,
     };
 
     setSessionRoutes((prev) => [...prev, route]);
@@ -471,481 +916,149 @@ export function ClimbTab() {
     setNewOutdoorCustomGs("");
     setNewOutdoorDescription("");
     setNewOutdoorStartedAt("");
+    setNewOutdoorSentAt("");
   }
 
   function updateOutdoorAttempts(id: string, delta: number) {
-    // Check if this is a confirmed route
-    const isConfirmed = confirmedRoutes.some((r) => r.id === id);
-
-    if (isConfirmed) {
-      // For confirmed routes, only allow modification if not sent
-      const route = confirmedRoutes.find((r) => r.id === id);
-      if (route && !route.isSent) {
-        setConfirmedRoutes((prev) =>
-          prev.map((r) =>
-            r.id === id
-              ? { ...r, attempts: Math.max(0, r.attempts + delta) }
-              : r
-          )
-        );
-        markConfirmedDirty(id);
-      }
-    } else {
-      // For session routes, allow modification
+    const sessionRoute = sessionRoutes.find((r) => r.id === id);
+    if (sessionRoute) {
       setSessionRoutes((prev) =>
         prev.map((r) =>
           r.id === id
-            ? { ...r, attempts: Math.max(0, r.attempts + delta) }
+            ? { ...r, attempts: Math.max(attemptsFloor(r.isSent), r.attempts + delta) }
             : r
         )
       );
+      return;
     }
+
+    const route = effectiveRoutes.find((r) => r.id === id);
+    if (!route) return;
+    const attempts = Math.max(attemptsFloor(route.isSent), route.attempts + delta);
+    if (attempts === route.attempts) return;
+    setPendingEdit(id, { attempts });
   }
 
   function toggleOutdoorSent(id: string) {
-    // Check if this is a confirmed route
-    const isConfirmed = confirmedRoutes.some((r) => r.id === id);
-    const confirmedRoute = confirmedRoutes.find((r) => r.id === id);
-
-    if (isConfirmed && confirmedRoute) {
-      // For confirmed routes that are already sent, do nothing
-      if (confirmedRoute.isSent) {
-        return;
-      }
-      // For confirmed routes: only toggle pending send status, don't immediately mark as sent
-      setActivePendingSentIds((prev) => {
-        const newPending = new Set(prev);
-        if (newPending.has(id)) {
-          newPending.delete(id);
-        } else {
-          newPending.add(id);
-        }
-        return Array.from(newPending);
-      });
-      // Mark as dirty since we're changing the send status
-      markConfirmedDirty(id);
-    } else {
-      // For session routes: do nothing - they need to be confirmed first
-      // Session routes cannot be marked as sent directly
+    const sessionRoute = sessionRoutes.find((r) => r.id === id);
+    if (sessionRoute) {
+      setSessionRoutes((prev) =>
+        prev.map((r) => {
+          if (r.id !== id) return r;
+          return r.isSent
+            ? { ...r, isSent: false, sentAt: undefined }
+            : { ...r, isSent: true, sentAt: todayLocal(), attempts: Math.max(1, r.attempts) };
+        })
+      );
       return;
     }
-  }
 
-  function updateOutdoorRoute(id: string, updater: (r: OutdoorRoute) => OutdoorRoute) {
-    setConfirmedRoutes((prev) =>
-      prev.map((r) => (r.id === id ? updater(r) : r))
+    const route = effectiveRoutes.find((r) => r.id === id);
+    if (!route) return;
+    setPendingEdit(
+      id,
+      route.isSent
+        ? { isSent: false, sentAt: undefined }
+        : { isSent: true, sentAt: todayLocal(), attempts: Math.max(1, route.attempts) }
     );
-    markConfirmedDirty(id);
   }
 
-  function removeOutdoorRoute(id: string) {
-    setSessionRoutes((prev) => prev.filter((r) => r.id !== id));
-    setConfirmedRoutes((prev) => prev.filter((r) => r.id !== id));
-    setActivePendingSentIds((prev) => prev.filter((pid) => pid !== id));
-    setDirtyConfirmedIds((prev) => prev.filter((did) => did !== id));
-  }
-
-  function executeDeleteOutdoor() {
-    if (!outdoorDeleteConfirmId) return;
-    removeOutdoorRoute(outdoorDeleteConfirmId);
+  async function executeDeleteOutdoor() {
+    const id = outdoorDeleteConfirmId;
+    if (!id) return;
     setOutdoorDeleteConfirmId(null);
+
+    if (sessionRoutes.some((r) => r.id === id)) {
+      setSessionRoutes((prev) => prev.filter((r) => r.id !== id));
+      return;
+    }
+
+    setOutdoorBusy(true);
+    setOutdoorError(null);
+    let deleteError: string | null = null;
+    try {
+      const res = await apiDeleteOutdoorClimb(id);
+      if (!res.ok) deleteError = "Failed to delete the route.";
+    } catch {
+      deleteError = "Failed to delete the route.";
+    }
+    setPendingEdits((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    await refreshOutdoor();
+    if (deleteError) setOutdoorError(deleteError);
+    setOutdoorBusy(false);
   }
 
-  function confirmSession() {
-    setConfirmedRoutes((prev) => [...prev, ...sessionRoutes]);
-    setSessionRoutes([]);
+  // Push the current session's routes to the server as one batch. The server stores all
+  // of them or none, so on failure the whole list stays put and the user can retry.
+  async function confirmSession() {
+    if (!sessionRoutes.length || outdoorBusy) return;
+    setOutdoorBusy(true);
+    setOutdoorError(null);
+
+    const batch = sessionRoutes;
+    let error: string | null = null;
+
+    try {
+      const res = await apiSaveOutdoorClimbs(batch.map(toOutdoorCreatePayload));
+      if (res.ok && res.routes) {
+        // Routes come back in the order they were sent, so custom grade-system labels
+        // can be filed against the ids the server just assigned.
+        const labels = readStored<OutdoorLabelCache>(OUTDOOR_STORAGE_KEYS.LABELS, {});
+        res.routes.forEach((row, i) => {
+          const source = batch[i];
+          if (source?.gradeSystem === OTHER_GRADE_SYSTEM_ID && source.gradeSystemLabel) {
+            labels[row.route_id] = source.gradeSystemLabel;
+          }
+        });
+        writeStored(OUTDOOR_STORAGE_KEYS.LABELS, labels);
+        setSessionRoutes([]);
+      } else {
+        error = res.error || "Couldn't save these routes.";
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Couldn't save these routes.";
+    }
+
+    await refreshOutdoor();
+    if (error) setOutdoorError(`${error} Your routes are still listed under Current Session.`);
+    setOutdoorBusy(false);
   }
 
-  function confirmActiveProjects() {
-    const now = new Date().toISOString().split("T")[0];
-    setConfirmedRoutes((prev) =>
-      prev.map((r) => {
-        if (activePendingSentIds.includes(r.id)) {
-          return {
-            ...r,
-            isSent: true,
-            sentAt: now,
-            attempts: Math.max(1, r.attempts),
-          };
-        }
-        return r;
-      })
-    );
-    setActivePendingSentIds([]);
-    setDirtyConfirmedIds((prev) => prev.filter((id) => !activePendingSentIds.includes(id)));
-  }
+  // Commit pending edits as one batch; the server applies them all or rejects them all.
+  async function savePendingEdits(ids: string[]) {
+    if (!ids.length || outdoorBusy) return;
+    setOutdoorBusy(true);
+    setOutdoorError(null);
 
-  function confirmSentEdits() {
-    setDirtyConfirmedIds([]);
-  }
+    const batch = ids
+      .filter((id) => pendingEdits[id])
+      .map((id) => toUpdatePayload(id, pendingEdits[id]));
+    let error: string | null = null;
 
-  // Filter and search helper for outdoor routes
-  const filterOutdoorRoutes = (routes: OutdoorRoute[], searchQuery: string): OutdoorRoute[] => {
-    if (!searchQuery.trim()) return routes;
-    const query = searchQuery.toLowerCase();
-    return routes.filter((r) =>
-      r.name.toLowerCase().includes(query) ||
-      r.location.toLowerCase().includes(query) ||
-      r.grade.toLowerCase().includes(query) ||
-      (r.description?.toLowerCase().includes(query) ?? false)
-    );
-  };
+    try {
+      const res = await apiUpdateOutdoorClimbs(batch);
+      if (res.ok) {
+        setPendingEdits((prev) => {
+          const next = { ...prev };
+          ids.forEach((id) => delete next[id]);
+          return next;
+        });
+      } else {
+        error = res.error || "Couldn't save these changes.";
+      }
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Couldn't save these changes.";
+    }
 
-  // --- Sub-components ----------------------------------------------------------
-
-  // ProjectingTab component
-  interface ProjectingTabProps {
-    sessionRoutes: OutdoorRoute[];
-    confirmedRoutes: OutdoorRoute[];
-    outdoorSearch: string;
-    activePendingSentIds: string[];
-    dirtyConfirmedIds: string[];
-    renderOutdoorSystemName: (r: OutdoorRoute) => string;
-    toDateInput: (dateStr: string | undefined) => string;
-    updateOutdoorAttempts: (id: string, delta: number) => void;
-    toggleOutdoorSent: (id: string) => void;
-    updateOutdoorRoute: (id: string, updater: (r: OutdoorRoute) => OutdoorRoute) => void;
-    removeOutdoorRoute: (id: string) => void;
-    confirmSession: () => void;
-    confirmActiveProjects: () => void;
-    setIsAddOutdoorDialogOpen: (open: boolean) => void;
-    setOutdoorDeleteConfirmId: (id: string | null) => void;
-    setNewOutdoorStartedAt: (value: string) => void;
-  }
-
-  function ProjectingTab({
-    sessionRoutes,
-    confirmedRoutes,
-    outdoorSearch,
-    activePendingSentIds,
-    dirtyConfirmedIds,
-    renderOutdoorSystemName,
-    toDateInput,
-    updateOutdoorAttempts,
-    toggleOutdoorSent,
-    updateOutdoorRoute,
-    removeOutdoorRoute,
-    confirmSession,
-    confirmActiveProjects,
-    setIsAddOutdoorDialogOpen,
-    setOutdoorDeleteConfirmId,
-    setNewOutdoorStartedAt,
-  }: ProjectingTabProps) {
-    const hasPendingChanges = activePendingSentIds.length > 0 || dirtyConfirmedIds.length > 0;
-
-    // Get unsent confirmed routes
-    const unsentConfirmedRoutes = confirmedRoutes.filter((r) => !r.isSent);
-
-    // Combine and filter
-    const allProjectingRoutes = [...sessionRoutes, ...unsentConfirmedRoutes];
-    const filteredRoutes = filterOutdoorRoutes(allProjectingRoutes, outdoorSearch);
-
-    const isDirty = (id: string) => dirtyConfirmedIds.includes(id);
-    const isPendingSent = (id: string) => activePendingSentIds.includes(id);
-
-    // Check if a route is from confirmed (not session)
-    // const isConfirmedRoute = (id: string) => confirmedRoutes.some((r) => r.id === id);
-
-    const filteredSession = filterOutdoorRoutes(sessionRoutes, outdoorSearch);
-    const q = outdoorSearch;
-
-    return (
-      <div className="space-y-4">
-        {/* Current Session */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Current Session</span>
-            <span className="text-xs text-muted-foreground">{sessionRoutes.length} route{sessionRoutes.length !== 1 ? 's' : ''}</span>
-          </div>
-          {filteredSession.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-3">
-              {q ? 'No matches.' : 'No routes added yet.'}
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {filteredSession.map(route => (
-                <OutdoorRouteCard
-                  key={route.id}
-                  route={route}
-                  isSessionRoute={true}
-                  isDirty={false}
-                  isPendingSent={false}
-                  renderOutdoorSystemName={renderOutdoorSystemName}
-                  toDateInput={toDateInput}
-                  updateOutdoorAttempts={updateOutdoorAttempts}
-                  toggleOutdoorSent={toggleOutdoorSent}
-                  updateOutdoorRoute={updateOutdoorRoute}
-                  removeOutdoorRoute={removeOutdoorRoute}
-                  setOutdoorDeleteConfirmId={setOutdoorDeleteConfirmId}
-                />
-              ))}
-            </div>
-          )}
-          <Button onClick={() => { setNewOutdoorStartedAt(new Date().toISOString().split('T')[0]); setIsAddOutdoorDialogOpen(true); }} variant="outline" className="w-full mt-3">
-            <Plus className="h-4 w-4 mr-2" />Add Project
-          </Button>
-          {sessionRoutes.length > 0 && (
-            <Button onClick={confirmSession} className="w-full mt-2 bg-primary hover:bg-primary/90">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Confirm & Save ({sessionRoutes.length} route{sessionRoutes.length !== 1 ? 's' : ''})
-            </Button>
-          )}
-        </div>
-
-        {/* Confirmed but unsent routes */}
-        {unsentConfirmedRoutes.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
-                Confirmed ({unsentConfirmedRoutes.length})
-              </Badge>
-              {hasPendingChanges && (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    confirmActiveProjects();
-                    confirmSentEdits();
-                  }}
-                  className="text-xs bg-orange-500 hover:bg-orange-600 text-white"
-                >
-                  Confirm & Save
-                </Button>
-              )}
-            </div>
-            {filterOutdoorRoutes(unsentConfirmedRoutes, outdoorSearch).map((r) => (
-              <OutdoorRouteCard
-                key={r.id}
-                route={r}
-                isSessionRoute={false}
-                isDirty={isDirty(r.id)}
-                isPendingSent={isPendingSent(r.id)}
-                renderOutdoorSystemName={renderOutdoorSystemName}
-                toDateInput={toDateInput}
-                updateOutdoorAttempts={updateOutdoorAttempts}
-                toggleOutdoorSent={toggleOutdoorSent}
-                updateOutdoorRoute={updateOutdoorRoute}
-                removeOutdoorRoute={removeOutdoorRoute}
-                setOutdoorDeleteConfirmId={setOutdoorDeleteConfirmId}
-              />
-            ))}
-          </div>
-        )}
-
-        {sessionRoutes.length === 0 && unsentConfirmedRoutes.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No projecting routes. Add your first outdoor project!
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  // SentTab component
-  interface SentTabProps {
-    confirmedRoutes: OutdoorRoute[];
-    outdoorSearch: string;
-    dirtyConfirmedIds: string[];
-    renderOutdoorSystemName: (r: OutdoorRoute) => string;
-    toDateInput: (dateStr: string | undefined) => string;
-    updateOutdoorRoute: (id: string, updater: (r: OutdoorRoute) => OutdoorRoute) => void;
-    removeOutdoorRoute: (id: string) => void;
-    confirmSentEdits: () => void;
-    setOutdoorDeleteConfirmId: (id: string | null) => void;
-  }
-
-  function SentTab({
-    confirmedRoutes,
-    outdoorSearch,
-    dirtyConfirmedIds,
-    renderOutdoorSystemName,
-    toDateInput,
-    updateOutdoorRoute,
-    removeOutdoorRoute,
-    confirmSentEdits,
-    setOutdoorDeleteConfirmId,
-  }: SentTabProps) {
-    const sentRoutes = confirmedRoutes.filter((r) => r.isSent);
-    const filteredRoutes = filterOutdoorRoutes(sentRoutes, outdoorSearch);
-    const hasDirtyRoutes = dirtyConfirmedIds.some((id) => sentRoutes.some((r) => r.id === id));
-
-    return (
-      <div className="space-y-3">
-        {hasDirtyRoutes && (
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              onClick={confirmSentEdits}
-              className="text-xs bg-orange-500 hover:bg-orange-600 text-white"
-            >
-              Confirm & Save
-            </Button>
-          </div>
-        )}
-
-        {filteredRoutes.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No sent routes yet. Send your first outdoor climb!
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {filteredRoutes.map((r) => (
-              <OutdoorRouteCard
-                key={r.id}
-                route={r}
-                isSessionRoute={false}
-                isDirty={dirtyConfirmedIds.includes(r.id)}
-                isPendingSent={false}
-                renderOutdoorSystemName={renderOutdoorSystemName}
-                toDateInput={toDateInput}
-                updateOutdoorAttempts={updateOutdoorAttempts}
-                toggleOutdoorSent={toggleOutdoorSent}
-                updateOutdoorRoute={updateOutdoorRoute}
-                removeOutdoorRoute={removeOutdoorRoute}
-                setOutdoorDeleteConfirmId={setOutdoorDeleteConfirmId}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // OutdoorRouteCard component - shared between both tabs
-  interface OutdoorRouteCardProps {
-    route: OutdoorRoute;
-    isSessionRoute: boolean;
-    isDirty: boolean;
-    isPendingSent: boolean;
-    renderOutdoorSystemName: (r: OutdoorRoute) => string;
-    toDateInput: (dateStr: string | undefined) => string;
-    updateOutdoorAttempts: (id: string, delta: number) => void;
-    toggleOutdoorSent: (id: string) => void;
-    updateOutdoorRoute: (id: string, updater: (r: OutdoorRoute) => OutdoorRoute) => void;
-    removeOutdoorRoute: (id: string) => void;
-    setOutdoorDeleteConfirmId: (id: string | null) => void;
-  }
-
-  function OutdoorRouteCard({
-    route,
-    isSessionRoute,
-    isDirty,
-    isPendingSent,
-    renderOutdoorSystemName,
-    toDateInput,
-    updateOutdoorAttempts,
-    toggleOutdoorSent,
-    updateOutdoorRoute,
-    removeOutdoorRoute,
-    setOutdoorDeleteConfirmId,
-  }: OutdoorRouteCardProps) {
-    const isSent = route.isSent;
-    const isFlash = isSent && route.attempts === 1;
-    const canDecreaseAttempts = isSessionRoute || !isSent;
-
-    return (
-      <div className={`p-4 bg-muted/30 rounded-xl border ${isDirty ? 'border-orange-400 ring-1 ring-orange-200' : 'border-border/50'}`}>
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <Badge variant="secondary" className="bg-primary/10 text-primary">
-                {route.grade}
-              </Badge>
-              <span className="font-medium text-sm">{renderOutdoorSystemName(route)}</span>
-              {isPendingSent && (
-                <Badge variant="outline" className="text-xs text-orange-500 border-orange-500">
-                  Pending send
-                </Badge>
-              )}
-            </div>
-            <h3 className="font-semibold mt-2 text-lg">{route.name}</h3>
-            {route.location && (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                <MapPin className="h-3 w-3" />
-                <span>{route.location}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 flex-wrap mt-2">
-            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-xs">Started: {toDateInput(route.startedAt) || 'N/A'}</span>
-          </div>
-          {isSent && route.sentAt && (
-            <div className="flex items-center gap-3 flex-wrap">
-              <CheckCircle className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-xs text-green-600">Sent: {toDateInput(route.sentAt)}</span>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => updateOutdoorAttempts(route.id, -1)}
-                className="h-5 w-5"
-                disabled={route.isSent || route.attempts === 0}
-              >
-                <Minus className="h-3 w-3" />
-              </button>
-              <div className="text-center min-w-[52px]">
-                <div className={`font-bold ${route.isSent ? 'text-green-700' : 'text-primary'}`}>{route.attempts}</div>
-                <div className="text-xs text-muted-foreground">attempts</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => updateOutdoorAttempts(route.id, 1)}
-                className="h-5 w-5"
-                disabled={route.isSent}
-              >
-                <Plus className="h-3 w-3" />
-              </button>
-            </div>
-            <div className="flex flex-col gap-1.5 items-end">
-              <Button
-                size="sm"
-                variant="default"
-                onClick={() => toggleOutdoorSent(route.id)}
-                disabled={isSessionRoute}
-                className={
-                  route.isSent
-                    ? "bg-green-600 hover:bg-green-700 text-white"
-                    : isPendingSent
-                      ? "bg-orange-500 hover:bg-orange-600 text-white"
-                      : isSessionRoute
-                        ? "opacity-30 cursor-not-allowed"
-                        : "opacity-40 hover:opacity-60"
-                }
-                title={isSessionRoute ? "Confirm route first to mark as sent" : undefined}
-              >
-                {route.isSent && route.attempts === 1 ? (
-                    <Zap className="h-4 w-4 mr-1 fill-yellow-500 text-yellow-500" />
-                    ) : (
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                )}
-                {route.isSent ? "Sent!" : isPendingSent ? "Pending Sent" : isSessionRoute ? "Confirm First" : "Sent!"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => removeOutdoorRoute(route.id)}
-                className="text-destructive hover:text-destructive text-xs h-6 px-2"
-              >
-                Remove
-              </Button>
-            </div>
-        </div>
-
-            {/* Description */}
-            {route.description && (
-                <div className="text-sm text-muted-foreground text-wrap pt-2 border-t border-border/30">
-                {route.description}
-                </div>
-            )}
-        </div>
-      </div>
-    );
+    // Refreshing also prunes edits for routes deleted elsewhere, so a retry after a
+    // "some routes no longer exist" rejection goes through.
+    await refreshOutdoor();
+    if (error) setOutdoorError(error);
+    setOutdoorBusy(false);
   }
 
   // --- UI ------------------------------------------------------------------
@@ -1237,40 +1350,46 @@ export function ClimbTab() {
             )}
           </div>
 
+          {outdoorError && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {outdoorError}
+            </div>
+          )}
+
           {/* Projecting Tab */}
           {outdoorTab === "projecting" && (
             <ProjectingTab
               sessionRoutes={sessionRoutes}
-              confirmedRoutes={confirmedRoutes}
+              activeRoutes={activeRoutes}
               outdoorSearch={outdoorSearch}
-              activePendingSentIds={activePendingSentIds}
-              dirtyConfirmedIds={dirtyConfirmedIds}
-              renderOutdoorSystemName={renderOutdoorSystemName}
-              toDateInput={toDateInput}
-              updateOutdoorAttempts={updateOutdoorAttempts}
-              toggleOutdoorSent={toggleOutdoorSent}
-              updateOutdoorRoute={updateOutdoorRoute}
-              removeOutdoorRoute={removeOutdoorRoute}
-              confirmSession={confirmSession}
-              confirmActiveProjects={confirmActiveProjects}
-              setNewOutdoorStartedAt={setNewOutdoorStartedAt}
-              setIsAddOutdoorDialogOpen={setIsAddOutdoorDialogOpen}
-              setOutdoorDeleteConfirmId={setOutdoorDeleteConfirmId}
+              busy={outdoorBusy}
+              activePendingCount={activePendingIds.length}
+              isDirty={isDirty}
+              isPendingSendChange={isPendingSendChange}
+              renderSystemName={renderOutdoorSystemName}
+              onAttempts={updateOutdoorAttempts}
+              onToggleSent={toggleOutdoorSent}
+              onRequestDelete={setOutdoorDeleteConfirmId}
+              onAddClick={openAddOutdoorDialog}
+              onConfirmSession={confirmSession}
+              onSaveActive={() => savePendingEdits(activePendingIds)}
             />
           )}
 
           {/* Sent Tab */}
           {outdoorTab === "sent" && (
             <SentTab
-              confirmedRoutes={confirmedRoutes}
+              sentRoutes={sentRoutes}
               outdoorSearch={outdoorSearch}
-              dirtyConfirmedIds={dirtyConfirmedIds}
-              renderOutdoorSystemName={renderOutdoorSystemName}
-              toDateInput={toDateInput}
-              updateOutdoorRoute={updateOutdoorRoute}
-              removeOutdoorRoute={removeOutdoorRoute}
-              confirmSentEdits={confirmSentEdits}
-              setOutdoorDeleteConfirmId={setOutdoorDeleteConfirmId}
+              busy={outdoorBusy}
+              pendingCount={sentPendingIds.length}
+              isDirty={isDirty}
+              isPendingSendChange={isPendingSendChange}
+              renderSystemName={renderOutdoorSystemName}
+              onAttempts={updateOutdoorAttempts}
+              onToggleSent={toggleOutdoorSent}
+              onRequestDelete={setOutdoorDeleteConfirmId}
+              onSave={() => savePendingEdits(sentPendingIds)}
             />
           )}
         </CardContent>
@@ -1563,9 +1682,9 @@ export function ClimbTab() {
                 onValueChange={(v) => {
                   const next = Number(v);
                   setNewOutdoorGradeSystem(next);
-                  localStorage.setItem(LS_KEYS.DEFAULT_GS, String(next));
-                  if (next !== 999) setNewOutdoorCustomGs("");
-                  const preset = byId.get(next)?.grades ?? [];
+                  localStorage.setItem(LS_KEYS.DEFAULT_OUTDOOR_GS, String(next));
+                  if (next !== OTHER_GRADE_SYSTEM_ID) setNewOutdoorCustomGs("");
+                  const preset = outdoorById.get(next)?.grades ?? [];
                   setNewOutdoorGrade(preset[0] ?? "");
                 }}
               >
@@ -1573,7 +1692,7 @@ export function ClimbTab() {
                   <SelectValue placeholder="Select grade system" />
                 </SelectTrigger>
                 <SelectContent>
-                  {systems.map((s) => (
+                  {outdoorSystems.map((s) => (
                     <SelectItem key={s.gradeId} value={String(s.gradeId)}>
                       {s.gradeSystem}
                     </SelectItem>
@@ -1583,7 +1702,7 @@ export function ClimbTab() {
                 </SelectContent>
               </Select>
 
-              {newOutdoorGradeSystem === 999 && (
+              {newOutdoorGradeSystem === OTHER_GRADE_SYSTEM_ID && (
                 <Input
                   placeholder="Enter custom system name (e.g. Local Gym)"
                   value={newOutdoorCustomGs}
@@ -1595,13 +1714,13 @@ export function ClimbTab() {
 
             <div className="grid grid-cols-1 gap-2">
               <Label className="text-xs">Grade *</Label>
-              {newOutdoorGradeSystem !== 999 && (byId.get(newOutdoorGradeSystem!)?.grades?.length ?? 0) > 0 ? (
+              {newOutdoorGradeSystem !== OTHER_GRADE_SYSTEM_ID && (outdoorById.get(newOutdoorGradeSystem!)?.grades?.length ?? 0) > 0 ? (
                 <Select value={newOutdoorGrade} onValueChange={setNewOutdoorGrade}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select grade" />
                   </SelectTrigger>
                   <SelectContent>
-                    {((byId.get(newOutdoorGradeSystem!)?.grades ?? []) as string[]).map((g) => (
+                    {(outdoorById.get(newOutdoorGradeSystem!)?.grades ?? []).map((g) => (
                       <SelectItem key={g} value={g}>{g}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1621,8 +1740,35 @@ export function ClimbTab() {
               <Input
                 type="date"
                 value={newOutdoorStartedAt}
+                max={newOutdoorSentAt || undefined}
                 onChange={(e) => setNewOutdoorStartedAt(e.target.value)}
               />
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Sent Date (optional)</Label>
+                {newOutdoorSentAt && (
+                  <button
+                    type="button"
+                    onClick={() => setNewOutdoorSentAt("")}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <Input
+                type="date"
+                value={newOutdoorSentAt}
+                min={newOutdoorStartedAt || undefined}
+                onChange={(e) => setNewOutdoorSentAt(e.target.value)}
+              />
+              <p className={`text-xs ${sentBeforeStart ? 'text-destructive' : 'text-muted-foreground'}`}>
+                {sentBeforeStart
+                  ? "Sent date can't be earlier than the start date."
+                  : "Fill this in if you already sent it — the route starts at 1 attempt, adjust with + / −."}
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
@@ -1637,10 +1783,7 @@ export function ClimbTab() {
             </div>
           </div>
           <DialogFooter>
-            <Button
-              onClick={addOutdoorRoute}
-              disabled={!newOutdoorName.trim() || !newOutdoorLocation.trim() || !newOutdoorGrade.trim() || (newOutdoorGradeSystem === 999 && !newOutdoorCustomGs.trim())}
-            >
+            <Button onClick={addOutdoorRoute} disabled={!canAddOutdoorRoute}>
               Add Project
             </Button>
           </DialogFooter>

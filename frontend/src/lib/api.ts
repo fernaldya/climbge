@@ -2,7 +2,8 @@
 import type { UserProfile } from '../types/user';
 import type { LastClimb, WeeklyClimbSummary, HistoricalClimb, GradeSystem,
     CommitSessionPayload, CommitSessionResponse, ClimbLocations,
-    ApprovalQueue, ApprovalDecision
+    ApprovalQueue, ApprovalDecision,
+    OutdoorClimbRow, OutdoorCreatePayload, OutdoorUpdatePayload
  } from '../types/climb';
 import type { NewsPost } from '../types/news';
 import type {
@@ -186,9 +187,10 @@ export async function apiSaveMeasurementsMetric(payload: {
   }
 }
 
-export async function apiFetchGradeSystems(): Promise<GradeSystem[]> {
+export async function apiFetchGradeSystems(outdoor: boolean = false): Promise<GradeSystem[]> {
   try {
-    const res = await fetch(joinURL("/api/grades"), { credentials: "include" });
+    const url = joinURL("/api/grades" + (outdoor ? "?outdoor=true" : ""));
+    const res = await fetch(url, { credentials: "include" });
     if (!res.ok) return [];
     return (await res.json()) as GradeSystem[];
   } catch {
@@ -416,40 +418,57 @@ export function apiCancelPlannedClimb(planId: string) {
 }
 
 // ===== Outdoor Climbs =====
-export async function apiFetchOutdoorClimbs() {
+/**
+ * Returns null (not []) when the request fails, so callers can tell "you have no outdoor
+ * routes" apart from "we couldn't reach the server" and keep showing their cached list.
+ */
+export async function apiFetchOutdoorClimbs(): Promise<OutdoorClimbRow[] | null> {
   try {
     const res = await fetch(joinURL('/api/outdoor-climbs'), { credentials: 'include' });
-    if (!res.ok) return [];
-    return await res.json();
+    if (!res.ok) return null;
+    const body = await res.json();
+    return Array.isArray(body) ? (body as OutdoorClimbRow[]) : null;
   } catch {
-    return [];
+    return null;
   }
 }
 
-export async function apiSaveOutdoorClimb(route: any): Promise<{ ok: boolean; route?: any }> {
+type OutdoorBatchResponse = { ok: boolean; routes?: OutdoorClimbRow[]; error?: string };
+
+/**
+ * Saves a whole batch in one request. The server stores all of them or none, so a
+ * rejection leaves nothing half-written for the caller to reconcile. Routes come back
+ * in the order they were sent.
+ */
+export async function apiSaveOutdoorClimbs(
+  routes: OutdoorCreatePayload[]
+): Promise<OutdoorBatchResponse> {
   try {
     const res = await fetch(joinURL('/api/outdoor-climbs'), {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ route }),
+      body: JSON.stringify({ routes }),
     });
-    return json<{ ok: boolean; route?: any }>(res);
+    return json<OutdoorBatchResponse>(res);
   } catch (e) {
     if (e instanceof ApiError) throw e;
     mapNetworkError(e);
   }
 }
 
-export async function apiUpdateOutdoorClimb(routeId: string, updates: any): Promise<{ ok: boolean }> {
+/** Applies a batch of edits in one transaction; all or nothing, as with the create. */
+export async function apiUpdateOutdoorClimbs(
+  updates: OutdoorUpdatePayload[]
+): Promise<OutdoorBatchResponse> {
   try {
-    const res = await fetch(joinURL(`/api/outdoor-climbs/${routeId}`), {
+    const res = await fetch(joinURL('/api/outdoor-climbs'), {
       method: 'PUT',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updates }),
     });
-    return json<{ ok: boolean }>(res);
+    return json<OutdoorBatchResponse>(res);
   } catch (e) {
     if (e instanceof ApiError) throw e;
     mapNetworkError(e);
@@ -458,7 +477,7 @@ export async function apiUpdateOutdoorClimb(routeId: string, updates: any): Prom
 
 export async function apiDeleteOutdoorClimb(routeId: string): Promise<{ ok: boolean }> {
   try {
-    const res = await fetch(joinURL(`/api/outdoor-climbs/${routeId}`), {
+    const res = await fetch(joinURL(`/api/outdoor-climbs/${encodeURIComponent(routeId)}`), {
       method: 'DELETE',
       credentials: 'include',
     });
