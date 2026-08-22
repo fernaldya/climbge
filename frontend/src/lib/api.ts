@@ -2,7 +2,7 @@
 import type { UserProfile } from '../types/user';
 import type { LastClimb, WeeklyClimbSummary, HistoricalClimb, GradeSystem,
     CommitSessionPayload, CommitSessionResponse, ClimbLocations,
-    ApprovalQueue, ApprovalDecision
+    ApprovalQueue, ApprovalDecision, SessionDetail
  } from '../types/climb';
 import type { NewsPost } from '../types/news';
 import type {
@@ -160,6 +160,14 @@ export async function apiHistoricalClimb(): Promise<HistoricalClimb[]> {
   const json = await fetchJSON<HistoryResp>("/api/history");
   const data: any = json ?? {};
   return Array.isArray(data) ? data : (data.history ?? []);
+}
+
+// Uses request() rather than fetchJSON so a missing session surfaces as a
+// NOT_FOUND ApiError instead of collapsing into null alongside real failures.
+export function apiSessionDetail(sessionId: string, gradeSystem: number) {
+  return request<SessionDetail>(
+    `/api/history/${encodeURIComponent(sessionId)}/${encodeURIComponent(gradeSystem)}`
+  );
 }
 
 export async function apiNews(): Promise<NewsPost[]> {
