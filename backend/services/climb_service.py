@@ -186,6 +186,13 @@ def commit_session_service(user_id: str, payload: dict):
     if not started_at or not ended_at:
         return {"error": "Missing session start or end time"}, 400
 
+    if sess_notes is not None and not isinstance(sess_notes, str):
+        return {"error": "Session notes must be text"}, 400
+
+    # A blank textarea sends "" rather than omitting the key; store NULL for it
+    # so "no notes" is one value in the column instead of two.
+    sess_notes = (sess_notes or "").strip() or None
+
     try:
         with pool.connection() as conn, conn.transaction():
             with conn.cursor(row_factory=dict_row) as cur:

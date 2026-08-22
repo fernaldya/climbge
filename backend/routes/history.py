@@ -1,7 +1,12 @@
 from __future__ import annotations
 from flask import Blueprint, jsonify, session
 from utils.auth import login_required
-from services.history_service import fetch_climb_history, fetch_last_climb, fetch_weekly_stats
+from services.history_service import (
+    fetch_climb_history,
+    fetch_last_climb,
+    fetch_session_detail,
+    fetch_weekly_stats,
+)
 from utils.security import SESSION_KEY
 
 history_bp = Blueprint("history", __name__)
@@ -11,6 +16,14 @@ history_bp = Blueprint("history", __name__)
 def get_history():
     uid = session[SESSION_KEY]
     payload, status = fetch_climb_history(uid)
+    return jsonify(payload), status
+
+
+@history_bp.get("/history/<session_id>/<int:grade_system>")
+@login_required
+def get_session_detail(session_id, grade_system):
+    uid = session[SESSION_KEY]
+    payload, status = fetch_session_detail(uid, session_id, grade_system)
     return jsonify(payload), status
 
 

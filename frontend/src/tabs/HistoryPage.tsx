@@ -1,6 +1,7 @@
 // src/tabs/HistoryPage.tsx
 import { useEffect, useState } from "react";
-import { MapPin, Zap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ChevronRight, MapPin, Ruler, Zap } from "lucide-react";
 import type { HistoricalClimb } from "../types/climb";
 import { Card, CardContent } from "../components/ui/card";
 import { apiHistoricalClimb } from "../lib/api";
@@ -60,8 +61,8 @@ export function HistoryTab() {
               </div>
             ) : (
               <ul className="space-y-5">
-                {sessions.map((s, i) => (
-                  <li key={String((s as any).id ?? i)}>
+                {sessions.map((s) => (
+                  <li key={`${s.sessionId}-${s.gradeSystem}`}>
                     <SessionCard s={s} />
                   </li>
                 ))}
@@ -74,28 +75,38 @@ export function HistoryTab() {
   );
 }
 
-function SessionCard({ s }: { s: HistoricalClimb }) {
-  const row = s as unknown as {
-    id?: string;
-    climbDay: string;
-    location?: string;
-    sent: number ;
-    attempted: number;
-    best?: string | null;
-    sentPct: string;
-    flashes?: number | null;
-  };
-
+function SessionCard({ s: row }: { s: HistoricalClimb }) {
+  const navigate = useNavigate();
   const showFlashes = (row.flashes ?? 0) > 0;
 
   return (
-    <div className="rounded-xl bg-[#FFF6ED] p-4 ring-1 ring-[#F5D7B3]">
-      {/* Header: left = date, right = location */}
+    <button
+      type="button"
+      // The summary rides along so the detail screen paints its header with no
+      // spinner. Deep links arrive without it and fall back to the API.
+      onClick={() =>
+        navigate(`/app/history/${row.sessionId}/${row.gradeSystem}`, { state: row })
+      }
+      className="block w-full rounded-xl bg-[#FFF6ED] p-4 text-left ring-1 ring-[#F5D7B3] transition
+                 hover:bg-[#FFEFDF] active:scale-[0.985]
+                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E26E00]"
+    >
+      {/* Header: left = date, right = grade system + location */}
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="font-semibold text-base">{row.climbDay}</div>
+        <div className="flex items-center gap-1 text-base font-semibold">
+          {row.climbDay}
+          <ChevronRight className="h-4 w-4 text-[#8A5A00]" />
+        </div>
 
-        <div className="flex flex-col items-end">
-          {/* Location row (top-right) */}
+        <div className="flex flex-col items-end gap-0.5">
+          {/* A session logged in two grade systems shows one card each, so the
+              system is what tells the otherwise-identical cards apart. */}
+          {row.gradeSystemLabel && (
+            <div className="flex items-center gap-1 text-[11px] font-medium text-[#B07100]">
+              <Ruler className="h-3 w-3 flex-none" />
+              <span className="truncate max-w-[140px]">{row.gradeSystemLabel}</span>
+            </div>
+          )}
           <div className="flex items-center gap-1 text-[11px] text-[#8A5A00]">
             <MapPin className="h-3 w-3" />
             <span className="truncate max-w-[140px]">{row.location ?? "—"}</span>
@@ -137,6 +148,6 @@ function SessionCard({ s }: { s: HistoricalClimb }) {
           <div className="text-xs text-[#8A5A00]">Send %</div>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
