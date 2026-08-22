@@ -25,7 +25,7 @@ export type HistoricalClimb = {
   sentPct: string;
   climbDate: string;
   climbDay: string;
-  location?: string;
+  location?: string | null;
 };
 
 export type SessionRoute = {
