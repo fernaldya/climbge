@@ -1,5 +1,6 @@
 // src/tabs/HistoryDetailPage.tsx
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, X, Zap } from "lucide-react";
 import type { HistoricalClimb, SessionDetail, SessionRoute } from "../types/climb";
@@ -16,14 +17,17 @@ export function HistoryDetailTab() {
 
   // HistoryPage hands the summary over on tap, so the header and metrics paint
   // instantly. A deep link or a fresh tab arrives without it.
-  const summary = (location.state ?? null) as HistoricalClimb | null;
+  const summary = asSummary(location.state);
 
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!sessionId || !gradeSystem) return;
+    if (!sessionId || !gradeSystem) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
 
     (async () => {
@@ -139,7 +143,7 @@ export function HistoryDetailTab() {
 
 /* ---------- pieces ---------- */
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8A5A00]">
       {children}
@@ -257,6 +261,19 @@ function RouteRow({ r }: { r: SessionRoute }) {
       )}
     </div>
   );
+}
+
+// Router state is whatever the previous screen chose to push, so it's checked
+// rather than cast. Anything unrecognised falls back to the loading path.
+function asSummary(state: unknown): HistoricalClimb | null {
+  if (!state || typeof state !== "object") return null;
+  const s = state as Partial<HistoricalClimb>;
+  const usable =
+    typeof s.sent === "number" &&
+    typeof s.attempted === "number" &&
+    typeof s.flashes === "number" &&
+    typeof s.sentPct === "string";
+  return usable ? (s as HistoricalClimb) : null;
 }
 
 // DD MMM YYYY, matching how BuddiesPage and Newsboard format dates.
