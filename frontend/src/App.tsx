@@ -15,6 +15,7 @@ import { Home, Mountain, History, User } from "lucide-react";
 import { HomeTab } from './tabs/HomePage';
 import { ClimbTab } from './tabs/ClimbPage';
 import { HistoryTab } from './tabs/HistoryPage';
+import { HistoryDetailTab } from './tabs/HistoryDetailPage';
 import { ProfileTab } from './tabs/ProfilePage';
 import { BuddiesTab } from './tabs/BuddiesPage';
 
@@ -102,6 +103,9 @@ export default function App() {
         <Route path="climb" element={<ClimbTab />} />
         <Route path="buddies" element={<BuddiesTab />} />
         <Route path="history" element={<HistoryTab />} />
+        {/* A card is a (session, grade system) pair, so both key the URL.
+            NavLink has no `end`, so the History tab stays lit on this child. */}
+        <Route path="history/:sessionId/:gradeSystem" element={<HistoryDetailTab />} />
         <Route path="profile" element={
             <RequireAuth>
               <ProfileTab userProfile={profile!} onLogout={handleLogout} />
