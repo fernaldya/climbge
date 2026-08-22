@@ -180,7 +180,9 @@ def commit_session_service(user_id: str, payload: dict):
 
     started_at = sess.get("started_at")
     ended_at = sess.get("ended_at")
-    sess_notes = sess.get("notes")
+    # A blank textarea sends "" rather than omitting the key; store NULL for it
+    # so "no notes" is one value in the column instead of two.
+    sess_notes = (sess.get("notes") or "").strip() or None
     sess_location = sess.get("location")
 
     if not started_at or not ended_at:

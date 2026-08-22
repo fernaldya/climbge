@@ -296,7 +296,10 @@ export function ClimbTab() {
         session: {
           started_at: session.startedAt,
           ended_at: new Date().toISOString(),
-          notes,
+          // undefined drops the key from the JSON body, so an untouched field
+          // lands as NULL rather than ''. Same coercion a route's description
+          // gets when it's added.
+          notes: notes.trim() || undefined,
           location: (session.location ?? location)?.gym,
         },
         routes: session.routes.map((r) => ({
