@@ -12,14 +12,44 @@ export type LastClimb = {
   totalAttempted: number;
 };
 
+// One card is a (session, grade system) pair — a session logged against two
+// grade systems produces two cards, so both keys are needed to identify one.
 export type HistoricalClimb = {
+  sessionId: string;
+  gradeSystem: number;
+  gradeSystemLabel?: string | null;
   sent: number;
   attempted: number;
   flashes: number;
   best: string;
   sentPct: string;
+  climbDate: string;
   climbDay: string;
   location?: string;
+};
+
+export type SessionRoute = {
+  routeId: string;
+  gradeLabel: string;
+  attempts: number;
+  sent: boolean;
+  flash: boolean;
+  description?: string | null;
+};
+
+export type SessionDetail = {
+  sessionId: string;
+  gradeSystem: number;
+  climbDate: string | null;
+  climbDay: string | null;
+  location?: string | null;
+  notes?: string | null;
+  sent: number;
+  attempted: number;
+  flashes: number;
+  best: string | null;
+  sentPct: string;
+  routes: SessionRoute[];
 };
 
 export type GradeSystem = {
