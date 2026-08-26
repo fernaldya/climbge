@@ -165,7 +165,7 @@ export function NewLocationDialog({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Used to auto-select the grade system when climbers pick this gym.
+                  Used to auto-select the grade system when climbers pick this gym; Defaults to V grade if not filled.
                 </p>
               </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
