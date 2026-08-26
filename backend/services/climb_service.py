@@ -232,8 +232,13 @@ def fetch_climb_locations() -> List[Dict[str, Any]]:
     [
       {
         "Indonesia": {
-            "Jakarta": ["Alpine Outpost Indonesia", "Indoclimb Kemang"],
-            "Alam Sutera": ["Dreamstone Alam Sutera"]
+            "Jakarta": [
+                {"gymName": "Alpine Outpost Indonesia", "gymGradeSystem": 3},
+                {"gymName": "Indoclimb Kemang", "gymGradeSystem": None}
+            ],
+            "Alam Sutera": [
+                {"gymName": "Dreamstone Alam Sutera", "gymGradeSystem": None}
+            ]
         }
       }
     ]
@@ -241,18 +246,21 @@ def fetch_climb_locations() -> List[Dict[str, Any]]:
     with pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
         cur.execute(
             """
-            select country, location, array_agg(gym_name order by gym_chain asc, gym_name asc) as gyms
+            select country, location, gym_name, gym_grade_system
             from climbing_locations
             where status = 'active'
-            group by country, location
+            order by country, location, gym_chain asc, gym_name asc
             """
         )
         rows = cur.fetchall()
 
-    grouped = defaultdict(dict)
+    grouped = defaultdict(lambda: defaultdict(list))
 
     for row in rows:
-        grouped[row["country"]][row["location"]] = list(row["gyms"])
+        grouped[row["country"]][row["location"]].append({
+            "gymName": row["gym_name"],
+            "gymGradeSystem": row["gym_grade_system"],
+        })
 
     result = [{k: v} for k, v in grouped.items()]
 

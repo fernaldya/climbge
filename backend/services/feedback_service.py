@@ -1,6 +1,6 @@
 import logging
 from psycopg.rows import dict_row
-from psycopg.errors import UniqueViolation
+from psycopg.errors import UniqueViolation, ForeignKeyViolation
 from utils.http import err
 from utils.connect_db import pool
 from string import capwords
@@ -45,6 +45,7 @@ def submit_new_climb_location(user_id: str, payload: dict):
     gym_chain = new_location.get('gymChain')
     gym_location = new_location.get('gymLocation')
     country = new_location.get('country')
+    gym_grade_system = new_location.get('gymGradeSystem')
 
     # Reject non-string inputs rather than coercing objects/lists into the DB.
     gym_name = gym_name.strip() if isinstance(gym_name, str) else None
@@ -55,18 +56,25 @@ def submit_new_climb_location(user_id: str, payload: dict):
     if not gym_name or not gym_location or not country:
         return err("invalid_request", "Gym name, location, and country are required", 400)
 
+    # Optional: the gym's default grade system, if the submitter knows it.
+    if gym_grade_system is not None:
+        if isinstance(gym_grade_system, bool) or not isinstance(gym_grade_system, int):
+            return err("invalid_request", "Grade system must be a valid id", 400)
+
     try:
         with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
-                "INSERT INTO climbing_locations (gym_name, gym_chain, location, country, submitted_by) VALUES (%s, %s, %s, %s, %s)",
-                (capwords(gym_name), capwords(gym_chain) if gym_chain else None, gym_location.upper(), capwords(country), user_id),
+                "INSERT INTO climbing_locations (gym_name, gym_chain, location, country, submitted_by, gym_grade_system) VALUES (%s, %s, %s, %s, %s, %s)",
+                (capwords(gym_name), capwords(gym_chain) if gym_chain else None, gym_location.upper(), capwords(country), user_id, gym_grade_system),
             )
 
         logger.info("climb_location_submitted user_id=%s country=%s location=%s", user_id, capwords(country), gym_location.upper())
         return {"ok": True}, 200
-        
+
     except UniqueViolation:
         return err("already_exists", "This gym location has already been submitted.", 409)
+    except ForeignKeyViolation:
+        return err("invalid_request", "Grade system must be a valid id", 400)
     except Exception:
         logger.exception("climb_location_submit failed user_id=%s", user_id)
         return err("db_error", "Database error.", 500)
