@@ -209,7 +209,7 @@ export function PlanClimbDialog({
             <Select value={gym} onValueChange={setGym} disabled={!city}>
               <SelectTrigger><SelectValue placeholder="Select gym" /></SelectTrigger>
               <SelectContent>
-                {gyms.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                {gyms.map((g) => <SelectItem key={g.gymName} value={g.gymName}>{g.gymName}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

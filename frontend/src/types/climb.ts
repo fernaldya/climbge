@@ -85,9 +85,13 @@ export type ApprovalDecision = {
   action: 'approve' | 'reject';
 };
 
-// Climb locations are returned grouped by country, then city, then gym names:
-// [ { "Indonesia": { "Jakarta": ["Alpine Outpost", "Indoclimb Kemang"] } } ]
-export type ClimbLocationTree = Record<string, Record<string, string[]>>;
+// Climb locations are returned grouped by country, then city, then gyms:
+// [ { "Indonesia": { "Jakarta": [{ gymName: "Alpine Outpost", gymGradeSystem: 3 }] } } ]
+export type ClimbGymEntry = {
+  gymName: string;
+  gymGradeSystem: number | null;
+};
+export type ClimbLocationTree = Record<string, Record<string, ClimbGymEntry[]>>;
 export type ClimbLocations = ClimbLocationTree[];
 
 export type SelectedLocation = {
@@ -95,6 +99,7 @@ export type SelectedLocation = {
   city: string;
   gym: string;
   custom?: boolean;
+  gymGradeSystem?: number | null;
 };
 
 export interface LocalRoute {

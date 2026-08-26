@@ -3,7 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { apiSubmitNewLocation } from "../lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { apiSubmitNewLocation, apiFetchGradeSystems } from "../lib/api";
+import type { GradeSystem } from "../types/climb";
 
 type Step = "form" | "confirm" | "done";
 
@@ -12,9 +14,10 @@ interface FormState {
   gymChain: string;
   gymLocation: string;
   country: string;
+  gymGradeSystem: number | null;
 }
 
-const empty: FormState = { gymName: "", gymChain: "", gymLocation: "", country: "" };
+const empty: FormState = { gymName: "", gymChain: "", gymLocation: "", country: "", gymGradeSystem: null };
 
 export function NewLocationDialog({
   open,
@@ -28,6 +31,7 @@ export function NewLocationDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetTimer, setResetTimer] = useState<number | null>(null);
+  const [gradeSystems, setGradeSystems] = useState<GradeSystem[]>([]);
 
   function resetState() {
     setStep("form");
@@ -37,6 +41,17 @@ export function NewLocationDialog({
   }
 
   useEffect(() => () => { if (resetTimer) window.clearTimeout(resetTimer); }, [resetTimer]);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      try {
+        setGradeSystems(await apiFetchGradeSystems());
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [open]);
 
   function handleClose() {
     if (submitting) return;
@@ -67,6 +82,7 @@ export function NewLocationDialog({
         gymChain: form.gymChain.trim() || undefined,
         gymLocation: form.gymLocation.trim(),
         country: form.country.trim(),
+        gymGradeSystem: form.gymGradeSystem ?? undefined,
       });
       setStep("done");
     } catch (e: any) {
@@ -126,6 +142,32 @@ export function NewLocationDialog({
                   onChange={set("country")}
                 />
               </div>
+              <div className="space-y-1">
+                <Label htmlFor="new-location-grade-system">
+                  Default Grade System{" "}
+                  <span className="text-muted-foreground text-xs">(Optional)</span>
+                </Label>
+                <Select
+                  value={form.gymGradeSystem != null ? String(form.gymGradeSystem) : undefined}
+                  onValueChange={(v) =>
+                    setForm(prev => ({ ...prev, gymGradeSystem: Number(v) }))
+                  }
+                >
+                  <SelectTrigger id="new-location-grade-system">
+                    <SelectValue placeholder="Select grade system" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {gradeSystems.map((s) => (
+                      <SelectItem key={s.gradeId} value={String(s.gradeId)}>
+                        {s.gradeSystem}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Used to auto-select the grade system when climbers pick this gym; Defaults to V grade if not filled.
+                </p>
+              </div>
               {error && <p className="text-xs text-destructive">{error}</p>}
             </div>
 
@@ -147,6 +189,15 @@ export function NewLocationDialog({
               {form.gymChain && <Row label="Gym Chain" value={form.gymChain} />}
               <Row label="Location" value={form.gymLocation} />
               <Row label="Country" value={form.country} />
+              {form.gymGradeSystem != null && (
+                <Row
+                  label="Grade System"
+                  value={
+                    gradeSystems.find((s) => s.gradeId === form.gymGradeSystem)?.gradeSystem
+                      ?? String(form.gymGradeSystem)
+                  }
+                />
+              )}
             </div>
 
             <p className="mt-4 text-xs text-muted-foreground">

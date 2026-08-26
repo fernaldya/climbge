@@ -222,8 +222,12 @@ export function ClimbTab() {
   }
 
   function addRouteClick() {
+    // The gym's own default grade system (if set) takes priority over
+    // whatever grade system was last used, since it reflects what the
+    // location actually grades its routes in.
+    const gymDefault = (session?.location ?? location)?.gymGradeSystem;
     const saved = localStorage.getItem(LS_KEYS.DEFAULT_GS);
-    const lastId = saved ? Number(saved) : (systems[0]?.gradeId ?? 999);
+    const lastId = gymDefault ?? (saved ? Number(saved) : (systems[0]?.gradeId ?? 999));
     setGsId(lastId);
     setCustomGs("");
     const preset = byId.get(lastId)?.grades ?? [];
@@ -594,23 +598,30 @@ export function ClimbTab() {
                           <div key={city} className="mt-1">
                             <div className="px-2 py-1 text-sm font-medium">{city}</div>
                             <div className="space-y-1">
-                              {gyms.map((gym) => {
+                              {gyms.map((g) => {
                                 const selected =
-                                  location?.gym === gym &&
+                                  location?.gym === g.gymName &&
                                   location?.city === city &&
                                   location?.country === country;
                                 return (
                                   <button
-                                    key={gym}
+                                    key={g.gymName}
                                     type="button"
-                                    onClick={() => pickLocation({ country, city, gym })}
+                                    onClick={() =>
+                                      pickLocation({
+                                        country,
+                                        city,
+                                        gym: g.gymName,
+                                        gymGradeSystem: g.gymGradeSystem,
+                                      })
+                                    }
                                     className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                                       selected
                                         ? "bg-orange-100 text-orange-700"
                                         : "hover:bg-muted"
                                     }`}
                                   >
-                                    <span className="truncate">{gym}</span>
+                                    <span className="truncate">{g.gymName}</span>
                                     {selected && <Check className="h-4 w-4 shrink-0" />}
                                   </button>
                                 );

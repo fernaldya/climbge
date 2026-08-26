@@ -253,6 +253,7 @@ export async function apiSubmitNewLocation(payload: {
   gymChain?: string;
   gymLocation: string;
   country: string;
+  gymGradeSystem?: number;
 }) {
   try {
     const res = await fetch(joinURL('/api/climb-location'), {
