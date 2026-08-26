@@ -1,4 +1,5 @@
 import logging
+import os
 from psycopg.rows import dict_row
 from psycopg.errors import UniqueViolation, ForeignKeyViolation
 from utils.http import err
@@ -57,9 +58,17 @@ def submit_new_climb_location(user_id: str, payload: dict):
         return err("invalid_request", "Gym name, location, and country are required", 400)
 
     # Optional: the gym's default grade system, if the submitter knows it.
+    # Falls back to DEFAULT_GRADE_SYSTEM when left blank.
     if gym_grade_system is not None:
         if isinstance(gym_grade_system, bool) or not isinstance(gym_grade_system, int):
             return err("invalid_request", "Grade system must be a valid id", 400)
+    else:
+        raw_default = os.getenv("DEFAULT_GRADE_SYSTEM", 3)
+        if raw_default:
+            try:
+                gym_grade_system = int(raw_default)
+            except ValueError:
+                logger.warning("DEFAULT_GRADE_SYSTEM env var is not a valid int: %s", raw_default)
 
     try:
         with pool.connection() as conn, conn.transaction(), conn.cursor(row_factory=dict_row) as cur:
