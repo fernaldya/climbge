@@ -72,6 +72,7 @@ export type PendingGymLocation = {
   gym_chain: string | null;
   location: string;
   country: string;
+  grade_system: string | null;
 };
 
 export type ApprovalQueue = {

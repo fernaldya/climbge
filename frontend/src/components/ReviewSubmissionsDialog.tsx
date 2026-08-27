@@ -142,6 +142,7 @@ export function ReviewSubmissionsDialog({
                         {l.gym_chain && <Detail label="Chain" value={l.gym_chain} />}
                         <Detail label="Location" value={l.location} />
                         <Detail label="Country" value={l.country} />
+                        {l.grade_system && <Detail label="Grade System" value={l.grade_system} />}
                         <DecisionButtons
                           busy={busy}
                           onApprove={() => decide("location", l.id, "approve")}
