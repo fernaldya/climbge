@@ -151,7 +151,7 @@ def get_approval_queue():
             
             cur.execute(
                 """
-                SELECT id, gym_name, gym_chain, location, country
+                SELECT id, gym_name, gym_chain, location, country, grade_system
                 FROM vw_pending_rejected_gym
                 """
             )
