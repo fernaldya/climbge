@@ -8,18 +8,21 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Check, Zap, MapPin, ChevronRight } from "lucide-react";
+import { Play, Pause, Square, Plus, Minus, CheckCircle, Clock, Target, FileText, Check, Zap, MapPin, ChevronRight, SlidersHorizontal, X } from "lucide-react";
 import { apiFetchGradeSystems, apiCommitClimbSession, apiFetchClimbLocations } from "../lib/api";
-import type { LocalSession, LocalRoute, GradeSystem, ClimbLocations, SelectedLocation } from "../types/climb";
+import type { LocalSession, LocalRoute, GradeSystem, ClimbLocations, ClimbGymEntry, SelectedLocation, LocationFilter } from "../types/climb";
 
 // --- Config / constants ----------------------------------------------------
 const LS_KEYS = {
   CURRENT: "climb.currentSession",
   DEFAULT_GS: "climb.defaultGradeSystem",
   LOCATION: "climb.location",
+  LOCATION_FILTER: "climb.locationFilter",
 } as const;
 
 const CUSTOM_LOCATION_MAX_LENGTH = 75;
+
+const EMPTY_LOCATION_FILTER: LocationFilter = { countries: [], cities: [] };
 
 
 // --- Helpers ---------------------------------------------------------------
@@ -27,6 +30,30 @@ function uuid(): string {
   return crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+// Cities are namespaced by country so "Jakarta, Indonesia" and a same-named
+// city elsewhere never collide in the filter.
+function cityKey(country: string, city: string): string {
+  return `${country}|${city}`;
+}
+
+function cityKeyCountry(key: string): string {
+  return key.slice(0, key.indexOf("|"));
+}
+
+function loadLocationFilter(): LocationFilter {
+  const raw = localStorage.getItem(LS_KEYS.LOCATION_FILTER);
+  if (!raw) return EMPTY_LOCATION_FILTER;
+  try {
+    const parsed = JSON.parse(raw) as Partial<LocationFilter>;
+    return {
+      countries: Array.isArray(parsed.countries) ? parsed.countries : [],
+      cities: Array.isArray(parsed.cities) ? parsed.cities : [],
+    };
+  } catch {
+    return EMPTY_LOCATION_FILTER;
+  }
 }
 
 function saveSession(ls: LocalSession | null) {
@@ -67,6 +94,8 @@ export function ClimbTab() {
   const [openLoc, setOpenLoc] = useState(false);
   const [showCustomLocation, setShowCustomLocation] = useState(false);
   const [customLocation, setCustomLocation] = useState("");
+  const [locFilter, setLocFilter] = useState<LocationFilter>(loadLocationFilter);
+  const [showLocFilter, setShowLocFilter] = useState(false);
 
   // Grade systems from DB
   const [systems, setSystems] = useState<GradeSystem[]>([]);
@@ -134,6 +163,11 @@ export function ClimbTab() {
     if (session) saveSession(session);
   }, [session]);
 
+  // The gym filter is a remembered preference, not session data.
+  useEffect(() => {
+    localStorage.setItem(LS_KEYS.LOCATION_FILTER, JSON.stringify(locFilter));
+  }, [locFilter]);
+
   // Timer ticker
   useEffect(() => {
     runningRef.current = running;
@@ -176,7 +210,78 @@ export function ClimbTab() {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
   }, [elapsed]);
 
+  // Country -> cities, for the filter chips.
+  const countryCities = useMemo(() => {
+    const m = new Map<string, string[]>();
+    locations.forEach((countryObj) =>
+      Object.entries(countryObj).forEach(([country, cities]) => {
+        const seen = m.get(country) ?? [];
+        Object.keys(cities).forEach((city) => {
+          if (!seen.includes(city)) seen.push(city);
+        });
+        m.set(country, seen);
+      })
+    );
+    return m;
+  }, [locations]);
+
+  const activeFilterCount = locFilter.countries.length + locFilter.cities.length;
+
+  // Only offer city chips for countries the user kept; with no country picked,
+  // every city is fair game.
+  const filterableCountries = useMemo(() => [...countryCities.keys()], [countryCities]);
+  const filterableCities = useMemo(() => {
+    const countries = locFilter.countries.length ? locFilter.countries : filterableCountries;
+    return countries.flatMap((country) =>
+      (countryCities.get(country) ?? []).map((city) => ({ country, city }))
+    );
+  }, [countryCities, filterableCountries, locFilter.countries]);
+
+  // Gym tree narrowed to the remembered filter; empty selections mean "show all".
+  const visibleLocations = useMemo(() => {
+    const out: Array<{ country: string; cities: Array<[string, ClimbGymEntry[]]> }> = [];
+    locations.forEach((countryObj) =>
+      Object.entries(countryObj).forEach(([country, cities]) => {
+        if (locFilter.countries.length && !locFilter.countries.includes(country)) return;
+        const kept = Object.entries(cities).filter(
+          ([city]) => !locFilter.cities.length || locFilter.cities.includes(cityKey(country, city))
+        );
+        if (kept.length) out.push({ country, cities: kept });
+      })
+    );
+    return out;
+  }, [locations, locFilter]);
+
   // --- Actions -------------------------------------------------------------
+  function toggleCountryFilter(country: string) {
+    setLocFilter((prev) => {
+      const on = prev.countries.includes(country);
+      const countries = on
+        ? prev.countries.filter((c) => c !== country)
+        : [...prev.countries, country];
+      return {
+        countries,
+        // City picks survive only while their country is still in scope —
+        // otherwise a leftover key from an unlisted country matches nothing and
+        // empties the gym list. With no country selected, every city is back in
+        // scope, so the picks stand on their own.
+        cities: countries.length
+          ? prev.cities.filter((k) => countries.includes(cityKeyCountry(k)))
+          : prev.cities,
+      };
+    });
+  }
+
+  function toggleCityFilter(country: string, city: string) {
+    const key = cityKey(country, city);
+    setLocFilter((prev) => ({
+      ...prev,
+      cities: prev.cities.includes(key)
+        ? prev.cities.filter((k) => k !== key)
+        : [...prev.cities, key],
+    }));
+  }
+
   function pickLocation(sel: SelectedLocation) {
     setLocation(sel);
     localStorage.setItem(LS_KEYS.LOCATION, JSON.stringify(sel));
@@ -580,58 +685,155 @@ export function ClimbTab() {
             <DialogTitle>Select location</DialogTitle>
             <DialogDescription>Choose the gym where you're climbing.</DialogDescription>
           </DialogHeader>
-          <div className="mt-4 rounded-xl border">
+          {/* Country / city filter — remembered across visits so frequent gyms
+              stay a tap away as the gym list grows. */}
+          {locations.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2 px-3 py-1.5"
+                  onClick={() => setShowLocFilter((v) => !v)}
+                  aria-expanded={showLocFilter}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filter
+                  {activeFilterCount > 0 && (
+                    <Badge className="ml-1">{activeFilterCount}</Badge>
+                  )}
+                </Button>
+                {activeFilterCount > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-1 border-none px-2 py-1.5 text-xs text-muted-foreground"
+                    onClick={() => setLocFilter(EMPTY_LOCATION_FILTER)}
+                  >
+                    <X className="h-3 w-3" /> Clear filter
+                  </Button>
+                )}
+              </div>
+
+              {showLocFilter && (
+                <div className="space-y-3 rounded-xl border p-3">
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Country
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {filterableCountries.map((country) => {
+                        const on = locFilter.countries.includes(country);
+                        return (
+                          <button
+                            key={country}
+                            type="button"
+                            onClick={() => toggleCountryFilter(country)}
+                            aria-pressed={on}
+                            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                              on
+                                ? "border-orange-300 bg-orange-100 text-orange-700"
+                                : "hover:bg-muted"
+                            }`}
+                          >
+                            {country}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Location
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {filterableCities.map(({ country, city }) => {
+                        const on = locFilter.cities.includes(cityKey(country, city));
+                        return (
+                          <button
+                            key={cityKey(country, city)}
+                            type="button"
+                            onClick={() => toggleCityFilter(country, city)}
+                            aria-pressed={on}
+                            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                              on
+                                ? "border-orange-300 bg-orange-100 text-orange-700"
+                                : "hover:bg-muted"
+                            }`}
+                          >
+                            {city}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-3 rounded-xl border">
             <ScrollArea className="max-h-80">
               {locations.length === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">
                   No locations available.
                 </div>
+              ) : visibleLocations.length === 0 ? (
+                <div className="space-y-2 p-4 text-sm text-muted-foreground">
+                  <div>No gyms match your filter.</div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="px-3 py-1.5 text-xs"
+                    onClick={() => setLocFilter(EMPTY_LOCATION_FILTER)}
+                  >
+                    Clear filter
+                  </Button>
+                </div>
               ) : (
                 <div className="divide-y">
-                  {locations.flatMap((countryObj) =>
-                    Object.entries(countryObj).map(([country, cities]) => (
-                      <div key={country} className="p-2">
-                        <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {country}
-                        </div>
-                        {Object.entries(cities).map(([city, gyms]) => (
-                          <div key={city} className="mt-1">
-                            <div className="px-2 py-1 text-sm font-medium">{city}</div>
-                            <div className="space-y-1">
-                              {gyms.map((g) => {
-                                const selected =
-                                  location?.gym === g.gymName &&
-                                  location?.city === city &&
-                                  location?.country === country;
-                                return (
-                                  <button
-                                    key={g.gymName}
-                                    type="button"
-                                    onClick={() =>
-                                      pickLocation({
-                                        country,
-                                        city,
-                                        gym: g.gymName,
-                                        gymGradeSystem: g.gymGradeSystem,
-                                      })
-                                    }
-                                    className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                                      selected
-                                        ? "bg-orange-100 text-orange-700"
-                                        : "hover:bg-muted"
-                                    }`}
-                                  >
-                                    <span className="truncate">{g.gymName}</span>
-                                    {selected && <Check className="h-4 w-4 shrink-0" />}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
+                  {visibleLocations.map(({ country, cities }) => (
+                    <div key={country} className="p-2">
+                      <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {country}
                       </div>
-                    ))
-                  )}
+                      {cities.map(([city, gyms]) => (
+                        <div key={city} className="mt-1">
+                          <div className="px-2 py-1 text-sm font-medium">{city}</div>
+                          <div className="space-y-1">
+                            {gyms.map((g) => {
+                              const selected =
+                                location?.gym === g.gymName &&
+                                location?.city === city &&
+                                location?.country === country;
+                              return (
+                                <button
+                                  key={g.gymName}
+                                  type="button"
+                                  onClick={() =>
+                                    pickLocation({
+                                      country,
+                                      city,
+                                      gym: g.gymName,
+                                      gymGradeSystem: g.gymGradeSystem,
+                                    })
+                                  }
+                                  className={`w-full flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                                    selected
+                                      ? "bg-orange-100 text-orange-700"
+                                      : "hover:bg-muted"
+                                  }`}
+                                >
+                                  <span className="truncate">{g.gymName}</span>
+                                  {selected && <Check className="h-4 w-4 shrink-0" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
                 </div>
               )}
             </ScrollArea>

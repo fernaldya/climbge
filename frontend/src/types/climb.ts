@@ -12,8 +12,6 @@ export type LastClimb = {
   totalAttempted: number;
 };
 
-// One card is a (session, grade system) pair — a session logged against two
-// grade systems produces two cards, so both keys are needed to identify one.
 export type HistoricalClimb = {
   sessionId: string;
   gradeSystem: number;
@@ -58,7 +56,6 @@ export type GradeSystem = {
   grades: string;
 }
 
-// Approval queue items mirror the backend view columns (snake_case).
 export type PendingGradeSystem = {
   grade_id: number;
   grade_system: string;
@@ -87,13 +84,17 @@ export type ApprovalDecision = {
 };
 
 // Climb locations are returned grouped by country, then city, then gyms:
-// [ { "Indonesia": { "Jakarta": [{ gymName: "Alpine Outpost", gymGradeSystem: 3 }] } } ]
 export type ClimbGymEntry = {
   gymName: string;
   gymGradeSystem: number | null;
 };
 export type ClimbLocationTree = Record<string, Record<string, ClimbGymEntry[]>>;
 export type ClimbLocations = ClimbLocationTree[];
+
+export type LocationFilter = {
+  countries: string[];
+  cities: string[];
+};
 
 export type SelectedLocation = {
   country: string;
