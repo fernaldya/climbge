@@ -38,6 +38,10 @@ function cityKey(country: string, city: string): string {
   return `${country}|${city}`;
 }
 
+function cityKeyCountry(key: string): string {
+  return key.slice(0, key.indexOf("|"));
+}
+
 function loadLocationFilter(): LocationFilter {
   const raw = localStorage.getItem(LS_KEYS.LOCATION_FILTER);
   if (!raw) return EMPTY_LOCATION_FILTER;
@@ -252,12 +256,18 @@ export function ClimbTab() {
   function toggleCountryFilter(country: string) {
     setLocFilter((prev) => {
       const on = prev.countries.includes(country);
+      const countries = on
+        ? prev.countries.filter((c) => c !== country)
+        : [...prev.countries, country];
       return {
-        countries: on
-          ? prev.countries.filter((c) => c !== country)
-          : [...prev.countries, country],
-        // Dropping a country also drops the city picks that lived under it.
-        cities: on ? prev.cities.filter((k) => !k.startsWith(`${country}|`)) : prev.cities,
+        countries,
+        // City picks survive only while their country is still in scope —
+        // otherwise a leftover key from an unlisted country matches nothing and
+        // empties the gym list. With no country selected, every city is back in
+        // scope, so the picks stand on their own.
+        cities: countries.length
+          ? prev.cities.filter((k) => countries.includes(cityKeyCountry(k)))
+          : prev.cities,
       };
     });
   }
